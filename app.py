@@ -78,7 +78,7 @@ if st.sidebar.button("Reload Files"):
     st.rerun()
 
 # --- Main area: tabs ---
-tab1, tab2, tab3 = st.tabs(["Edit Parameters", "Run Scheduler", "Downloads"])
+tab1, tab2, tab3 = st.tabs([ "Run Scheduler", "Downloads","Edit Parameters"])
 
 # Load the config (Rules.xlsx)
 try:
@@ -87,7 +87,7 @@ except Exception as e:
     st.error(f"Failed to load Rules.xlsx: {e}")
     st.stop()
 
-# --- Tab 2: Run Scheduler ---
+# --- Tab 1: Run Scheduler ---
 with tab2:
     st.subheader("Run Scheduler")
     output_file = st.text_input("Output File Name", "Stationsplan_out.xlsx")
@@ -186,8 +186,10 @@ with tab3:
                 file_name=os.path.basename(template_path),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-# --- Tab 1: Edit Parameters ---
-with tab1:
+
+
+# --- Tab 3: Edit Parameters ---
+with tab3:
     st.subheader("Parameters Editor")
     # Display editable sheets
     sheets_to_edit = ["Settings", "Doctors", "Stations", "DutyTypes", "Penalties", "Constraints", "GeneralRules", "StationCodeMap"]

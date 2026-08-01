@@ -286,7 +286,6 @@ if not st.session_state['config_loaded']:
     4.  Review and adjust parameters – Use the Edit tab to fine-tune settings, duty counts, penalties, and constraints.
     5.  Run the scheduler – Click Generate Schedule and wait for the optimised plan.
     6.  Download the results – Obtain the generated schedule and the updated Rules.xlsx from the Downloads tab.
-    ---
     ### Data Privacy and Security
     - All file uploads are processed locally in your browser and not stored on any external server.
     - Temporary files are automatically deleted after your session ends.

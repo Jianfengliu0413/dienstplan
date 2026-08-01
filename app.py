@@ -202,7 +202,6 @@ with st.sidebar:
     st.markdown("""
     <div class="sidebar-logo">
         <h4>UKT IM2</h4>
-        /*<p>Dienstplan</p>/
     </div>
     """, unsafe_allow_html=True)
     

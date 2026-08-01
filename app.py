@@ -78,11 +78,11 @@ st.markdown("""
     }
     [data-testid="stFileUploader"] .st-c8 {
         padding: 0.2rem 0.5rem !important;
-        min-height: 2.5rem !important;
+        min-height: 1.5rem !important;
     }
     /* Also reduce the drag-drop area inside */
     [data-testid="stFileUploader"] .st-b1 {
-        min-height: 2.5rem !important;
+        min-height: 1.5rem !important;
     }
     [data-testid="stFileUploader"] .st-b1 > div {
         padding: 0.2rem !important;

@@ -120,7 +120,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True) 
 
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 # --- Session state ---
 if 'initialized' not in st.session_state:
     st.session_state.clear()

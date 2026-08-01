@@ -28,14 +28,16 @@ hide_streamlit_style = """
     footer {visibility: hidden;}
     .stDeployButton {display: none !important;}
     .stAppDeployButton {display: none !important;}
-    header {visibility: hidden;}
-    .stAppHeader {display: none !important;}
     .stApp [data-testid="stToolbar"] {display: none;}
     .stApp [data-testid="stHeader"] {display: none;}
     .stApp [data-testid="stHeaderManageApp"] {display: none !important;}
     .stApp [data-testid="stHeaderAppMenu"] {display: none !important;}
+    /* Hide the "Manage app" dropdown and button */
+    .st-emotion-cache-1v0mbdj {display: none !important;}
+    .st-emotion-cache-1r6slb0 {display: none !important;}
     </style>
 """
+
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 st.title("UKT IM2")
@@ -264,142 +266,4 @@ with tab3:
         # Also update the file hash to refresh editors
         st.rerun()
  
-
-# # app.py
-
-# import streamlit as st
-# import pandas as pd
-# import os
-# import tempfile
-# import shutil
-# from io import BytesIO
-# from scheduler import run_scheduler
-# from config_loader import load_config
-# import openpyxl
-# import traceback
-
-# st.set_page_config(page_title="Duty Scheduler", layout="wide")
-# # Reset session state on page load (clears previous data)
-# if 'initialized' not in st.session_state:
-#     for key in list(st.session_state.keys()):
-#         del st.session_state[key]
-#     st.session_state['initialized'] = True
-#     st.rerun()
-
-# # Hide Streamlit branding 
-# hide_streamlit_style = """
-#     <style>
-#     /* Hide main menu */
-#     #MainMenu {visibility: hidden;}
-    
-#     /* Hide footer */
-#     footer {visibility: hidden;}
-    
-#     /* Hide deploy button / Hosted with Streamlit */
-#     .stDeployButton {display: none !important;}
-#     .stAppDeployButton {display: none !important;}
-    
-#     /* Hide the entire header (including "Manage app") */
-#     header {visibility: hidden;}
-#     .stAppHeader {display: none !important;}
-    
-#     /* Hide toolbar and GitHub icons */
-#     .stApp [data-testid="stToolbar"] {display: none;}
-#     .stApp [data-testid="stHeader"] {display: none;}
-    
-#     /* Hide the "Manage app" button specifically */
-#     .stApp [data-testid="stHeaderManageApp"] {display: none !important;}
-#     .stApp [data-testid="stHeaderAppMenu"] {display: none !important;}
-#     </style>
-# """
-# st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
-# st.title("UKT IM2")
-
-# # Clear session button
-# if st.sidebar.button("Clear Session"):
-#     st.session_state.clear()
-#     st.session_state["initialized"] = True
-#     # st.rerun()
-
-# if st.sidebar.button("Clear All Data"):
-#     for key in list(st.session_state.keys()):
-#         del st.session_state[key]
-#     st.rerun()
-# # --- Sidebar: File upload and session controls ---
-# st.sidebar.header("Upload Files")
-
-
-# # Upload Rules.xlsx
-# rules_file = st.sidebar.file_uploader("Upload Rules.xlsx", type=["xlsx"])
-# if rules_file is not None:
-#     # Reset output file if new rules uploaded
-#     if 'output_file' in st.session_state:
-#         st.session_state['output_file'] = None
-#     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_rules:
-#         tmp_rules.write(rules_file.getvalue())
-#         rules_path = tmp_rules.name
-# else:
-#     # Use default if exists
-#     if os.path.exists("Rules.xlsx"):
-#         rules_path = "Rules.xlsx"
-#     else:
-#         st.error("Please upload Rules.xlsx")
-#         st.stop()
-
-# # Upload Template (Stationsplan)
-# template_file = st.sidebar.file_uploader("Upload Template (Stationsplan)", type=["xlsx"])
-# if template_file is not None:
-#     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_template:
-#         tmp_template.write(template_file.getvalue())
-#         template_path = tmp_template.name
-# else:
-#     template_path = None  # will be read from Settings
-
-# # Upload Wishes (optional)
-# wishes_file = st.sidebar.file_uploader("Upload Wishes (optional)", type=["xlsx"])
-# if wishes_file is not None:
-#     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_wishes:
-#         tmp_wishes.write(wishes_file.getvalue())
-#         wishes_path = tmp_wishes.name
-# else:
-#     wishes_path = None
-
-# st.sidebar.markdown("---")
-# if st.sidebar.button("Reload Files"):
-#     st.rerun()
-
-# # --- Main area: tabs ---
-# tab1, tab2, tab3 = st.tabs([ "Run Scheduler", "Downloads","Edit Parameters"])
-
-# # Load the config (Rules.xlsx)
-# try:
-#     config = load_config(rules_path)
-# except Exception as e:
-#     st.error(f"Failed to load Rules.xlsx: {e}")
-#     st.stop()
-
-
-# # --- Tab 3: Edit Parameters ---
-# with tab3:
-#     st.subheader("Parameters Editor")
-#     # Display editable sheets
-#     sheets_to_edit = ["Settings", "Doctors", "Stations", "DutyTypes", "Penalties", "Constraints", "GeneralRules", "StationCodeMap"]
-
-#     edited_config = {}
-#     for sheet_name in sheets_to_edit:
-#         if sheet_name in config:
-#             st.markdown(f"### {sheet_name}")
-#             df = config[sheet_name].copy()
-#             df = df.fillna("")
-#             edited_df = st.data_editor(df, key=f"edit_{sheet_name}", use_container_width=True)
-#             edited_config[sheet_name] = edited_df
-#         else:
-#             st.info(f"Sheet {sheet_name} not found in Rules.xlsx")
-
-#     if st.button("Save Changes to Rules.xlsx"):
-#         with pd.ExcelWriter(rules_path, engine='openpyxl', mode='w') as writer:
-#             for sheet, df in edited_config.items():
-#                 df.to_excel(writer, sheet_name=sheet, index=False)
-#         config = load_config(rules_path)
-#         st.success("Rules.xlsx updated successfully!")
+ 

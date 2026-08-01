@@ -254,10 +254,9 @@ with st.sidebar:
 if not st.session_state['config_loaded']:
     # st.markdown('<div class="custom-card">', unsafe_allow_html=True)
     st.markdown("""
-    <div style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="color: #1a1a2e; font-weight: 700;">UKT IM2 Dienstplan</h1>
-        <p style="color: #6c757d; font-size: 1.1rem;"></p>
-        <hr style="width: 80px; border: 2px solid #2E86C1; margin: 0 auto;">
+    <div style="text-align: center; margin-bottom: 1rem;">
+        <h1 style="color: #1a1a2e; font-weight: 700; font-size: 1.8rem; margin: 0.2rem 0;">UKT IM2 Dienstplan</h1>
+        <hr style="width: 60px; border: 2px solid #2E86C1; margin: 0.3rem auto;">
     </div>
     """, unsafe_allow_html=True)
     

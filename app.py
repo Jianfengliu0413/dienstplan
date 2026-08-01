@@ -104,19 +104,24 @@ st.markdown("""
         text-align: center;
         color: #6c757d;
         font-size: 0.8rem;
-    }
-    /* Hide Streamlit branding */
+    } 
+    /* Hide Streamlit branding - keep header visible */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display: none !important;}
     .stAppDeployButton {display: none !important;}
-    /* .stApp [data-testid="stToolbar"] {display: none;}/
-    .stApp [data-testid="stHeader"] {display: none;}
+    .stApp [data-testid="stToolbar"] {display: none;}
+    /* Hide GitHub/Fork and Manage app only */
+    .stApp [data-testid="stHeaderGitHub"] {display: none !important;}
+    .stApp [data-testid="stHeaderFork"] {display: none !important;}
     .stApp [data-testid="stHeaderManageApp"] {display: none !important;}
     .stApp [data-testid="stHeaderAppMenu"] {display: none !important;}
+    /* Also hide any link containing "github" in header */
+    .stApp header a[href*="github"] {display: none !important;}
     /* Hide the "Manage app" dropdown and button */
     .st-emotion-cache-1v0mbdj {display: none !important;}
     .st-emotion-cache-1r6slb0 {display: none !important;}
+
 </style>
 """, unsafe_allow_html=True) 
 

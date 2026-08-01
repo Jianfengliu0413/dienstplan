@@ -50,31 +50,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 st.title("UKT IM2")
 
 # --- Sidebar: File upload ---
-st.sidebar.header("Upload Files")
-
-# We'll use a file uploader that triggers a rerun when a new file is uploaded
-# We'll store the file paths in session state so they persist across reruns
-
-# Upload Rules.xlsx
-# rules_file = st.sidebar.file_uploader("Upload Rules.xlsx", type=["xlsx"], key="rules_uploader")
-# if rules_file is not None:
-#     # Save to temp file
-#     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_rules:
-#         tmp_rules.write(rules_file.getvalue())
-#         rules_path = tmp_rules.name
-#         # Store in session state
-#         st.session_state['rules_path'] = rules_path
-# else:
-#     # If no new file uploaded, check if we have a previous path
-#     if 'rules_path' in st.session_state and os.path.exists(st.session_state['rules_path']):
-#         rules_path = st.session_state['rules_path']
-#     else:
-#         # Fallback to default
-#         if os.path.exists("Rules.xlsx"):
-#             rules_path = "Rules.xlsx"
-#         else:
-#             st.error("Please upload Rules.xlsx")
-#             st.stop()
+st.sidebar.header("Upload Files") 
 # At the top, after session reset
 if 'config_loaded' not in st.session_state:
     st.session_state['config_loaded'] = False
@@ -98,7 +74,9 @@ else:
         st.session_state['config_loaded'] = True
     else:
         rules_path = None
-        st.session_state['config_loaded'] = False
+        st.session_state['config_loaded'] = False 
+        st.error("Please upload Rules.xlsx")
+        st.stop()
 # Upload Template (Stationsplan)
 template_file = st.sidebar.file_uploader("Upload Template (Stationsplan)", type=["xlsx"])
 if template_file is not None:

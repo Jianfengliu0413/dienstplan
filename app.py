@@ -12,27 +12,37 @@ import openpyxl
 import traceback
 
 st.set_page_config(page_title="Duty Scheduler", layout="wide")
+# Reset session state on page load (clears previous data)
+if 'initialized' not in st.session_state:
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.session_state['initialized'] = True
+    st.rerun()
 
-# Hide Streamlit branding
+# Hide Streamlit branding 
 hide_streamlit_style = """
     <style>
+    /* Hide main menu */
     #MainMenu {visibility: hidden;}
+    
+    /* Hide footer */
     footer {visibility: hidden;}
-    .stAppDeployButton {display: none !important;}
+    
+    /* Hide deploy button / Hosted with Streamlit */
     .stDeployButton {display: none !important;}
+    .stAppDeployButton {display: none !important;}
+    
+    /* Hide the entire header (including "Manage app") */
+    header {visibility: hidden;}
     .stAppHeader {display: none !important;}
-    .stAppToolbar {display: none !important;}
-    /* Hide the hosted badge */
-    .st-at {
-        display: none !important;
-    }
-    /* Hide the footer completely */
-    .css-1rs6os {
-        display: none !important;
-    }
-    .st-emotion-cache-1v0mbdj {
-        display: none !important;
-    }
+    
+    /* Hide toolbar and GitHub icons */
+    .stApp [data-testid="stToolbar"] {display: none;}
+    .stApp [data-testid="stHeader"] {display: none;}
+    
+    /* Hide the "Manage app" button specifically */
+    .stApp [data-testid="stHeaderManageApp"] {display: none !important;}
+    .stApp [data-testid="stHeaderAppMenu"] {display: none !important;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)

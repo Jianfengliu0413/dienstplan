@@ -231,7 +231,7 @@ with st.sidebar:
             st.session_state['wishes_path'] = tmp.name
             st.session_state['file_hashes']['wishes'] = hashlib.md5(wishes_file.getvalue()).hexdigest()
     
-    st.markdown("---")
+    # st.markdown("---")
     
     st.markdown("### Status")
     
@@ -247,7 +247,7 @@ with st.sidebar:
     wishes_class = "status-loaded" if st.session_state['wishes_path'] else "status-missing"
     st.markdown(f"**Wishes** <span class='status-badge {wishes_class}'>{wishes_status}</span>", unsafe_allow_html=True)
     
-    st.markdown("---")
+    # st.markdown("---")
     
     if st.button("Reset All", use_container_width=True):
         for path_key in ['rules_file_path', 'template_path', 'wishes_path']:

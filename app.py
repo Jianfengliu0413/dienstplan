@@ -26,6 +26,7 @@ st.set_page_config(
 
 # --- Custom CSS ---
 st.markdown("""
+
 <style>
     /* Main background */
     .stApp {
@@ -41,9 +42,10 @@ st.markdown("""
         border: 1px solid #e9ecef;
     }
     /* Sidebar */
-    .css-1d391kg {
-        background-color: #ffffff;
-        border-right: 1px solid #dee2e6;
+    .css-1d391kg, .stSidebar, [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        border-right: 1px solid #dee2e6 !important;
+        color: #1a1a2e !important;
     }
     .sidebar-logo {
         text-align: center;
@@ -68,7 +70,7 @@ st.markdown("""
     /* Buttons */
     .stButton button {
         background-color: #2E86C1;
-        color: white;
+        color: white !important;
         font-weight: 500;
         border-radius: 6px;
         border: none;
@@ -87,14 +89,15 @@ st.markdown("""
         border-radius: 20px;
         font-size: 0.75rem;
         font-weight: 600;
+        color: #1a1a2e !important;
     }
     .status-loaded {
-        background: #d4edda;
-        color: #155724;
+        background: #d4edda !important;
+        color: #155724 !important;
     }
     .status-missing {
-        background: #f8d7da;
-        color: #721c24;
+        background: #f8d7da !important;
+        color: #721c24 !important;
     }
     /* Footer */
     .footer {
@@ -104,7 +107,52 @@ st.markdown("""
         text-align: center;
         color: #6c757d;
         font-size: 0.8rem;
-    } 
+    }
+    .footer a {
+        color: #2E86C1 !important;
+    }
+    /* Hide Streamlit branding – keep header visible for sidebar toggle */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display: none !important;}
+    .stAppDeployButton {display: none !important;}
+    .stApp [data-testid="stToolbar"] {display: none;}
+    /* Hide the "Manage app" button if it appears */
+    .stApp [data-testid="stHeaderManageApp"] {display: none !important;}
+    .stApp [data-testid="stHeaderAppMenu"] {display: none !important;}
+    
+    /* --- Mobile friendly font colors --- */
+    /* Ensure sidebar text is dark */
+    .stSidebar .stMarkdown, .stSidebar .stText, .stSidebar label {
+        color: #1a1a2e !important;
+    }
+    /* Ensure all text in the main area is dark */
+    .stMarkdown, .stText, .stCaption, .stInfo, .stWarning, .stError, .stSuccess {
+        color: #1a1a2e !important;
+    }
+    /* Metrics */
+    [data-testid="stMetricValue"] {
+        color: #1a1a2e !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #6c757d !important;
+    }
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        color: #1a1a2e !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #1a1a2e !important;
+    }
+    /* Expanders */
+    .streamlit-expanderHeader {
+        color: #1a1a2e !important;
+    }
+    /* File uploader text */
+    .stFileUploader label {
+        color: #1a1a2e !important;
+    }
+
     /* Hide Streamlit branding - keep header visible */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}

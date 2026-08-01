@@ -9,6 +9,7 @@ from io import BytesIO
 from scheduler import main as run_scheduler
 from config_loader import load_config
 import openpyxl
+import traceback
 
 st.set_page_config(page_title="Duty Scheduler", layout="wide")
 st.title("UKT IM2")
@@ -96,85 +97,89 @@ with tab2:
 
     if st.button("▶Generate Schedule"):
         with st.spinner("Running scheduler..."):
-            # Determine template path
-            if template_path is None:
-                # Read from Settings
-                settings_df = config.get("Settings", pd.DataFrame())
-                if not settings_df.empty:
-                    template_path = settings_df[settings_df["Setting"] == "TemplateFile"]["Value"].values[0]
-                else:
-                    st.error("Template file not specified. Please upload or set in Settings.")
-                    st.stop()
-
-            # Ensure output directory exists
-            output_dir = os.path.dirname(output_file)
-            if output_dir:
-                os.makedirs(output_dir, exist_ok=True)
-
-            # Create a temporary copy of rules with updated settings
-            # We'll write the template path and output path into the settings sheet
-            settings_df = config.get("Settings", pd.DataFrame())
-            # Update TemplateFile and OutputFile
-            settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
-            settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
-            # Save to a temp rules file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_rules_updated:
-                with pd.ExcelWriter(tmp_rules_updated.name, engine='openpyxl') as writer:
-                    for sheet, df in config.items():
-                        if sheet == "Settings":
-                            settings_df.to_excel(writer, sheet_name=sheet, index=False)
-                        else:
-                            df.to_excel(writer, sheet_name=sheet, index=False)
-                updated_rules_path = tmp_rules_updated.name
-
-            # Also set wishes path if provided
-            if wishes_path and "Settings" in config:
-                settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = wishes_path
-                # We'll just rely on the existing logic in scheduler
-
             try:
-                # Run scheduler (we need to call main with the updated rules path)
-                # We'll temporarily set the current directory to the app's directory
-                # But we can just call main with the rules path as a global
-                # We'll patch scheduler to use the provided rules path.
-                # Since main() reads from 'Rules.xlsx' hardcoded, we'll need to override.
-                # Simple: we can set a global variable or use an environment variable.
-                # Easiest: we'll modify main() to accept config_path argument.
-                # But to avoid changing scheduler.py, we'll use a context manager that changes the working directory? Not ideal.
-                # We'll instead copy the updated rules to a file named 'Rules.xlsx' in the current directory.
-                # Then call main().
-                # We'll copy the updated rules to ./Rules.xlsx (temporary)
-                shutil.copy(updated_rules_path, "Rules.xlsx")
-                # Also copy wishes if provided
-                if wishes_path:
-                    shutil.copy(wishes_path, "wishes.xlsx")  # but main expects the path from settings
-                # We'll also set the wishes path in settings if not set
+                # Determine template path
+                if template_path is None:
+                    # Read from Settings
+                    settings_df = config.get("Settings", pd.DataFrame())
+                    if not settings_df.empty:
+                        template_path = settings_df[settings_df["Setting"] == "TemplateFile"]["Value"].values[0]
+                    else:
+                        st.error("Template file not specified. Please upload or set in Settings.")
+                        st.stop()
 
-                # Now call main() – it will use ./Rules.xlsx and the template file from settings.
-                # We'll use sys.argv to pass? Not needed.
-                # We'll just call main() directly.
-                # However, main() currently doesn't accept arguments.
-                # We'll need to modify scheduler.py to accept them.
-                # Let's create a wrapper in scheduler.py: run_scheduler(template_path, output_path, config_path, wishes_path)
-                # We'll implement that now.
+                # Ensure output directory exists
+                output_dir = os.path.dirname(output_file)
+                if output_dir:
+                    os.makedirs(output_dir, exist_ok=True)
 
-                # For now, we'll call a new function that we'll add to scheduler.py
-                # We'll import run_scheduler from scheduler
-                from scheduler import run_scheduler as rs
-                result = rs(template_path, output_file, rules_path, wishes_path)
-                if result:
-                    st.success("Schedule generated successfully!")
-                    st.session_state['output_file'] = output_file
-                    st.session_state['rules_file'] = rules_path
-                else:
-                    st.error("Scheduler failed. Check logs.")
+                # Create a temporary copy of rules with updated settings
+                # We'll write the template path and output path into the settings sheet
+                settings_df = config.get("Settings", pd.DataFrame())
+                # Update TemplateFile and OutputFile
+                settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
+                settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
+                # Save to a temp rules file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_rules_updated:
+                    with pd.ExcelWriter(tmp_rules_updated.name, engine='openpyxl') as writer:
+                        for sheet, df in config.items():
+                            if sheet == "Settings":
+                                settings_df.to_excel(writer, sheet_name=sheet, index=False)
+                            else:
+                                df.to_excel(writer, sheet_name=sheet, index=False)
+                    updated_rules_path = tmp_rules_updated.name
+
+                # Also set wishes path if provided
+                if wishes_path and "Settings" in config:
+                    settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = wishes_path
+                    # We'll just rely on the existing logic in scheduler
+
+                try:
+                    # Run scheduler (we need to call main with the updated rules path)
+                    # We'll temporarily set the current directory to the app's directory
+                    # But we can just call main with the rules path as a global
+                    # We'll patch scheduler to use the provided rules path.
+                    # Since main() reads from 'Rules.xlsx' hardcoded, we'll need to override.
+                    # Simple: we can set a global variable or use an environment variable.
+                    # Easiest: we'll modify main() to accept config_path argument.
+                    # But to avoid changing scheduler.py, we'll use a context manager that changes the working directory? Not ideal.
+                    # We'll instead copy the updated rules to a file named 'Rules.xlsx' in the current directory.
+                    # Then call main().
+                    # We'll copy the updated rules to ./Rules.xlsx (temporary)
+                    shutil.copy(updated_rules_path, "Rules.xlsx")
+                    # Also copy wishes if provided
+                    if wishes_path:
+                        shutil.copy(wishes_path, "wishes.xlsx")  # but main expects the path from settings
+                    # We'll also set the wishes path in settings if not set
+
+                    # Now call main() – it will use ./Rules.xlsx and the template file from settings.
+                    # We'll use sys.argv to pass? Not needed.
+                    # We'll just call main() directly.
+                    # However, main() currently doesn't accept arguments.
+                    # We'll need to modify scheduler.py to accept them.
+                    # Let's create a wrapper in scheduler.py: run_scheduler(template_path, output_path, config_path, wishes_path)
+                    # We'll implement that now.
+
+                    # For now, we'll call a new function that we'll add to scheduler.py
+                    # We'll import run_scheduler from scheduler
+                    from scheduler import run_scheduler as rs
+                    result = rs(template_path, output_file, rules_path, wishes_path)
+                    if result:
+                        st.success("Schedule generated successfully!")
+                        st.session_state['output_file'] = output_file
+                        st.session_state['rules_file'] = rules_path
+                    else:
+                        st.error("Scheduler failed. Check logs.")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+                finally:
+                    # Clean up temp files
+                    if os.path.exists(updated_rules_path):
+                        os.unlink(updated_rules_path)
+
             except Exception as e:
-                st.error(f"Error: {e}")
-            finally:
-                # Clean up temp files
-                if os.path.exists(updated_rules_path):
-                    os.unlink(updated_rules_path)
-
+                st.error(f"Scheduler failed with error:\n\n```\n{e}\n```")
+                st.code(traceback.format_exc(), language="python")
     # Display log output if available
     if 'log_output' in st.session_state:
         st.text_area("Log Output", st.session_state.log_output, height=300)

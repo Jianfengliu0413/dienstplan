@@ -87,30 +87,6 @@ except Exception as e:
     st.error(f"Failed to load Rules.xlsx: {e}")
     st.stop()
 
-# --- Tab 1: Edit Parameters ---
-with tab1:
-    st.subheader("Parameters Editor")
-    # Display editable sheets
-    sheets_to_edit = ["Settings", "Doctors", "Stations", "DutyTypes", "Penalties", "Constraints", "GeneralRules", "StationCodeMap"]
-
-    edited_config = {}
-    for sheet_name in sheets_to_edit:
-        if sheet_name in config:
-            st.markdown(f"### {sheet_name}")
-            df = config[sheet_name].copy()
-            df = df.fillna("")
-            edited_df = st.data_editor(df, key=f"edit_{sheet_name}", use_container_width=True)
-            edited_config[sheet_name] = edited_df
-        else:
-            st.info(f"Sheet {sheet_name} not found in Rules.xlsx")
-
-    if st.button("Save Changes to Rules.xlsx"):
-        with pd.ExcelWriter(rules_path, engine='openpyxl', mode='w') as writer:
-            for sheet, df in edited_config.items():
-                df.to_excel(writer, sheet_name=sheet, index=False)
-        config = load_config(rules_path)
-        st.success("Rules.xlsx updated successfully!")
-
 # --- Tab 2: Run Scheduler ---
 with tab2:
     st.subheader("Run Scheduler")
@@ -210,3 +186,26 @@ with tab3:
                 file_name=os.path.basename(template_path),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+# --- Tab 1: Edit Parameters ---
+with tab1:
+    st.subheader("Parameters Editor")
+    # Display editable sheets
+    sheets_to_edit = ["Settings", "Doctors", "Stations", "DutyTypes", "Penalties", "Constraints", "GeneralRules", "StationCodeMap"]
+
+    edited_config = {}
+    for sheet_name in sheets_to_edit:
+        if sheet_name in config:
+            st.markdown(f"### {sheet_name}")
+            df = config[sheet_name].copy()
+            df = df.fillna("")
+            edited_df = st.data_editor(df, key=f"edit_{sheet_name}", use_container_width=True)
+            edited_config[sheet_name] = edited_df
+        else:
+            st.info(f"Sheet {sheet_name} not found in Rules.xlsx")
+
+    if st.button("Save Changes to Rules.xlsx"):
+        with pd.ExcelWriter(rules_path, engine='openpyxl', mode='w') as writer:
+            for sheet, df in edited_config.items():
+                df.to_excel(writer, sheet_name=sheet, index=False)
+        config = load_config(rules_path)
+        st.success("Rules.xlsx updated successfully!")

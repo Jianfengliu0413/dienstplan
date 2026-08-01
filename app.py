@@ -39,13 +39,19 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 st.title("UKT IM2")
 
-# --- Sidebar: File upload and session controls ---
-st.sidebar.header("Upload Files")
-
 # Clear session button
 if st.sidebar.button("Clear Session"):
     st.session_state.clear()
+    st.session_state["initialized"] = True
+    # st.rerun()
+
+if st.sidebar.button("Clear All Data"):
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
     st.rerun()
+# --- Sidebar: File upload and session controls ---
+st.sidebar.header("Upload Files")
+
 
 # Upload Rules.xlsx
 rules_file = st.sidebar.file_uploader("Upload Rules.xlsx", type=["xlsx"])

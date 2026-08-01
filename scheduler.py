@@ -245,8 +245,12 @@ def write_skills_auto(model: ScheduleModel, config_path: str):
     print("Generated 'Skills-Auto' sheet with all doctors × all duty types.")
     print("   Copy the rows you need into the 'Skills' sheet and delete the rest.")
 
-def main():
-    config_path = 'Rules.xlsx'
+def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_file=None):
+    """
+    Run the scheduler with given file paths.
+    If a path is None, it will be read from Settings sheet.
+    """
+    # config_path = 'Rules.xlsx'
     if not os.path.exists(config_path):
         create_default_config(config_path)
         print(f"Created default configuration at {config_path}. Please adjust and re-run.")

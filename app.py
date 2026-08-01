@@ -369,7 +369,6 @@ with tab1:
                     st.session_state['log_output'] = log_output
                 else:
                     st.error(f"Scheduler failed. Log:\n{log_output}")
-                                result = run_scheduler(template_path, output_file, "Rules.xlsx", wishes)
  
                 os.unlink(updated_rules)
                 

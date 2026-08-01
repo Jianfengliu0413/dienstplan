@@ -199,11 +199,11 @@ if 'initialized' not in st.session_state:
 
 # --- Sidebar ---
 with st.sidebar:
-    st.markdown("""
-    <div class="sidebar-logo">
-        <h4>UKT IM2</h4>
-    </div>
-    """, unsafe_allow_html=True)
+    # st.markdown("""
+    # <div class="sidebar-logo">
+    #     <h4>UKT IM2</h4>
+    # </div>
+    # """, unsafe_allow_html=True)
     
     # st.markdown("---")
     

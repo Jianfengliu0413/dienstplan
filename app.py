@@ -101,6 +101,17 @@ st.markdown("""
         background: #f8d7da !important;
         color: #721c24 !important;
     }
+    /* Force dark text in warning boxes (mobile fix) */
+    .stAlert .stMarkdown {
+        color: #1a1a2e !important;
+    }
+    .stAlert .stMarkdown strong {
+        color: #1a1a2e !important;
+    }
+    /* Reduce warning box padding for mobile */
+    .stAlert {
+        padding: 0.5rem 1rem !important;
+    }
     /* Footer */
     .footer {
         margin-top: 2rem;
@@ -190,12 +201,12 @@ if 'initialized' not in st.session_state:
 with st.sidebar:
     st.markdown("""
     <div class="sidebar-logo">
-        <h2>UKT IM2</h2>
-        <p>Dienstplan</p>
+        <h4>UKT IM2</h4>
+        /*<p>Dienstplan</p>/
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("---")
+    # st.markdown("---")
     
     st.markdown("### Upload Files")
     

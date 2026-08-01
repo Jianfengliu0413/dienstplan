@@ -159,27 +159,62 @@ with st.sidebar:
             del st.session_state[key]
         st.rerun()
 
-# --- Main content ---
+# --- Main content --- 
 if not st.session_state['config_loaded']:
-    # Welcome / instructions
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-    st.markdown("### Welcome to UKT IM2 Dienstplan")
-    st.markdown("""
-    This tool generates optimized duty schedules for your hospital department.
-
-    **To get started:**
-    1. Upload your **Rules.xlsx** file in the sidebar.
-    2. Upload the monthly **Template** (Stationsplan).
-    3. Optionally upload a **Wishes** file for doctor preferences (wishes).
-    4. Review/edit parameters, then click **Generate Schedule**.
-    5. Download the output schedule and updated rules.
-    """)
-    st.markdown("</div>", unsafe_allow_html=True)
     
-    # Show a sample of the expected file structure? 
-    st.info("You can download a sample Rules.xlsx from the **Downloads** tab once a file is loaded.")
+    # Header
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="color: #1a1a2e; font-weight: 700;">UKT IM2 Dienstplan</h1>
+        <p style="color: #6c757d; font-size: 1.1rem;">Enterprise‑Grade Duty Scheduling System</p>
+        <hr style="width: 80px; border: 2px solid #2E86C1; margin: 0 auto;">
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Confidentiality notice
+    st.warning("""
+    **⚠️ Confidential – Internal Use Only**  
+    This system is for authorised personnel of the UKT IM2 department only.  
+    All data processed through this application is sensitive and must be handled in compliance with applicable data protection regulations.
+    """)
+    
+    st.markdown("""
+    ### Getting Started
+    
+    This tool generates **optimized duty schedules** for your department using advanced constraint‑based optimisation.
+    
+    **To begin, please follow these steps:**
+    
+    1.  **Upload your configuration** – Provide your `Rules.xlsx` file in the sidebar. This file contains all department rules, doctor lists, stations, duty types, and constraints.
+    2.  **Upload the monthly template** – The `Stationsplan` Excel file for the target month (e.g., `Stationsplan November 26.xlsx`).
+    3.  **(Optional) Upload wishes** – If you have a `Wishes.xlsx` file with doctor preferences, upload it as well.
+    4.  **Review and adjust parameters** – Use the **Edit** tab to fine‑tune settings, duty counts, penalties, and constraints.
+    5.  **Run the scheduler** – Click **Generate Schedule** and wait for the optimised plan.
+    6.  **Download the results** – Obtain the generated schedule and the updated `Rules.xlsx` from the **Downloads** tab.
+    
+    ---
+    
+    ### Data Privacy & Security
+    
+    - All file uploads are processed **locally** in your browser and **not stored** on any external server.
+    - Temporary files are automatically **deleted** after your session ends.
+    - This application is **not** connected to any external databases or cloud storage.
+    
+    *For any technical issues, please contact the IT support team.*
+    """)
+    
+    # Footer
+    st.markdown("""
+    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #dee2e6; text-align: center; color: #6c757d; font-size: 0.85rem;">
+        UKT IM2 – Internal Use Only
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.info("Once you upload a valid `Rules.xlsx` file, this page will be replaced with the full featured interface.")
     st.stop()
-
 # Load config
 try:
     config = load_config(st.session_state['rules_file_path'])

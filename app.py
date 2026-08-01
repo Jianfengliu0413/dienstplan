@@ -275,10 +275,16 @@ if not st.session_state['config_loaded']:
     **Confidential - Internal Use Only**  This system is for authorised personnel only. All data processed through this application is sensitive and must be handled in compliance with applicable data protection regulations.
     """)
     
+    st.info("Once you upload a valid Rules.xlsx file, this page will be replaced with the full featured interface.")
+    
     st.markdown("""
+    ### Data Privacy and Security
+    - All file uploads are processed locally in your browser and not stored on any external server.
+    - Temporary files are automatically deleted after your session ends.
+    - This application is not connected to any external databases or cloud storage.
+    For any technical issues, please contact JF (TEL: xxxxx61369).
     ### Getting Started
     This tool uses the Google OR-Tools open‑source library. https://developers.google.com/optimization?hl=de
-    
     To begin, please follow these steps:
     1.  Upload your configuration – Provide your Rules.xlsx file in the sidebar. This file contains all department rules, doctor lists, stations, duty types, and constraints.
     2.  Upload the monthly template – The Stationsplan Excel file for the target month (e.g., xxxstationsplanxxx.xlsx).
@@ -286,11 +292,6 @@ if not st.session_state['config_loaded']:
     4.  Review and adjust parameters – Use the Edit tab to fine-tune settings, duty counts, penalties, and constraints.
     5.  Run the scheduler – Click Generate Schedule and wait for the optimised plan.
     6.  Download the results – Obtain the generated schedule and the updated Rules.xlsx from the Downloads tab.
-    ### Data Privacy and Security
-    - All file uploads are processed locally in your browser and not stored on any external server.
-    - Temporary files are automatically deleted after your session ends.
-    - This application is not connected to any external databases or cloud storage.
-    For any technical issues, please contact JF (TEL: xxxxx61369).
     """)
     
     st.markdown(""" 
@@ -301,8 +302,6 @@ if not st.session_state['config_loaded']:
     """, unsafe_allow_html=True)
     
     # st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.info("Once you upload a valid Rules.xlsx file, this page will be replaced with the full featured interface.")
     st.stop()
 
 # Load config

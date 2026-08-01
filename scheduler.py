@@ -254,7 +254,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
     if not os.path.exists(config_path):
         create_default_config(config_path)
         print(f"Created default configuration at {config_path}. Please adjust and re-run.")
-        return
+        return None
 
     config = load_config(config_path)
     settings = config['Settings'].set_index('Setting')['Value'].to_dict()
@@ -407,4 +407,7 @@ def run_scheduler(template_path, output_path, config_path, wishes_path=None):
     return success, log_capture.getvalue()
 
 if __name__ == '__main__':
-    main()
+    main(template_file=None, 
+         output_file=None, 
+         config_path='/Users/macjianfeng/Dropbox/github/python/dienstplan/Rules.xlsx', 
+         wishes_file=None)

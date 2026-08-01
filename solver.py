@@ -29,11 +29,11 @@ def solve_schedule(
     num_doctors = len(doctors)
 
     # Load initial working hours
-    try:
-        initial_hours = load_working_hours(config_path, doctors)
-    except Exception as e:
-        print(f"failed to get the initial_hours from 'Rules file: {e}'")
-        initial_hours = {doc: 0.0 for doc in doctors}
+    # try:
+    #     initial_hours = load_working_hours(config_path, doctors)
+    # except Exception as e:
+    #     print(f"failed to get the initial_hours from 'Rules file: {e}'")
+    initial_hours = {doc: 0.0 for doc in doctors}
     # Create CP model
     model_cp = cp_model.CpModel()
     x = {}
@@ -120,9 +120,9 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
             duty_i = duty_map[(day_idx, station, duty_abbr)]
             doctor_j = doctors.index(doc_name)
             model_cp.Add(x[(duty_i, doctor_j)] == 1)
-            print(f"🔒 REPAIR FIXED: {doc_name} must do {duty_abbr} at {station} on day {day_idx}")
+            print(f"REPAIR FIXED: {doc_name} must do {duty_abbr} at {station} on day {day_idx}")
         else:
-            print(f"⚠️ Warning: Fixed assignment for {doc_name} on {day_idx} {station} {duty_abbr} not found in duties.")
+            print(f"Warning: Fixed assignment for {doc_name} on {day_idx} {station} {duty_abbr} not found in duties.")
 
     # Essential constraints
     for i in range(num_duties):

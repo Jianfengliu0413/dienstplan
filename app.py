@@ -362,14 +362,15 @@ with tab1:
                 wishes = st.session_state.get('wishes_path')
                 if wishes:
                     shutil.copy(wishes, "wishes.xlsx")
-                
-                result = run_scheduler(template_path, output_file, "Rules.xlsx", wishes)
-                if result:
+                success, log_output = run_scheduler(template_path, output_file, "Rules.xlsx", wishes)
+                if success:
                     st.success("Schedule generated successfully")
                     st.session_state['output_file'] = output_file
+                    st.session_state['log_output'] = log_output
                 else:
-                    st.error("Scheduler failed. Please check logs.")
-                
+                    st.error(f"Scheduler failed. Log:\n{log_output}")
+                                result = run_scheduler(template_path, output_file, "Rules.xlsx", wishes)
+ 
                 os.unlink(updated_rules)
                 
             except Exception as e:

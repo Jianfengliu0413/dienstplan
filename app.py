@@ -69,24 +69,6 @@ st.markdown("""
         color: #1a1a2e;
         font-weight: 400;
     }
-    /* Compact file uploader for sidebar */
-    [data-testid="stFileUploader"] {
-        padding: 0.2rem 0 !important;
-        margin-bottom: 0.2rem !important;
-    }
-    [data-testid="stFileUploader"] > div {
-        padding: 0 !important;
-    }
-    [data-testid="stFileUploader"] .st-c8 {
-        padding: 0.1rem 0.5rem !important;
-        min-height: 2rem !important;
-    }
-    [data-testid="stFileUploader"] .st-b1 {
-        min-height: 2rem !important;
-    }
-    [data-testid="stFileUploader"] .st-b1 > div {
-        padding: 0.1rem !important;
-    }
 
     /* Buttons */
     .stButton button {

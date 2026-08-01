@@ -215,7 +215,7 @@ if not st.session_state['config_loaded']:
     st.markdown("""
     ### Getting Started
     
-    This tool uses the Google OR-Tools open‑source optimisation library. https://developers.google.com/optimization?hl=de
+    This tool uses the Google OR-Tools open‑source library. https://developers.google.com/optimization?hl=de
     
     To begin, please follow these steps:
     

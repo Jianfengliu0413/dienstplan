@@ -15,6 +15,8 @@ from openpyxl import load_workbook
 from models import ScheduleModel, DutyType
 from demand_builder import build_demand
 from visualize import visualize_schedule 
+import sys
+from io import StringIO
 from typing import List, Tuple, Dict
 
 def create_default_config(config_path: str):
@@ -328,7 +330,7 @@ def main():
     print(f"Total duties required: {total_duties}")
     print(f"Total doctor-days available (before vacations): {total_doctor_days}")
     if total_duties > total_doctor_days:
-        print(f"⚠️ Demand exceeds capacity by {total_duties - total_doctor_days} duties.")
+        print(f"Demand exceeds capacity by {total_duties - total_doctor_days} duties.")
     # Solve
     assignment, solver, duties, doctors, duty_hours, initial_hours = solve_schedule(
         schedule, config, config_path, repair_mode=True
@@ -387,40 +389,18 @@ def main():
         print(f"Visualization failed: {e}")
     return output_file
 
-
 def run_scheduler(template_path, output_path, config_path, wishes_path=None):
-    """
-    Run the scheduler with explicit file paths.
-    Returns True on success, False on failure.
-    """
-    # We'll need to set the global config path
-    # Since the original main() reads from a global config_path, we'll patch it.
-    # We'll copy the provided config_path to a temporary file and set it as Rules.xlsx
-    # Or we can modify main to accept arguments.
-    # Let's modify main() to accept arguments (we'll do it now).
-    # I'll provide an updated main() that accepts arguments.
-    # For now, we'll call main() with the paths.
-    # We'll update main() to accept template_file, output_file, config_path, wishes_file.
-    # We'll do that in the same file.
-    # Then call main(template_path, output_path, config_path, wishes_path)
-    # We'll also redirect stdout/stderr to capture logs.
-    import sys
-    from io import StringIO
-    import contextlib
-
     log_capture = StringIO()
-    with contextlib.redirect_stdout(log_capture):
-        try:
-            # Call main with the provided paths
-            # We need to update main to accept them.
-            # We'll implement main with optional arguments.
-            # We'll create a new function _run() that does the work.
-            # For simplicity, we'll modify main to accept args.
-            main(template_path, output_path, config_path, wishes_path)
-            return True
-        except Exception as e:
-            print(f"Error: {e}")
-            return False
+    sys.stdout = log_capture
+    try:
+        main(template_path, output_path, config_path, wishes_path)
+        success = True
+    except Exception as e:
+        success = False
+        raise e
+    finally:
+        sys.stdout = sys.__stdout__
+    return success, log_capture.getvalue()
 
 if __name__ == '__main__':
     main()

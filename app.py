@@ -233,7 +233,7 @@ if not st.session_state['config_loaded']:
     - Temporary files are automatically deleted after your session ends.
     - This application is not connected to any external databases or cloud storage.
     
-    For any technical issues, please contact the IT support team.
+    For any technical issues, please contact JF (TEL: xxxxx61369).
     """)
     
     st.markdown(""" 

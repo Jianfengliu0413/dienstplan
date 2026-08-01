@@ -215,7 +215,7 @@ if not st.session_state['config_loaded']:
     st.markdown("""
     ### Getting Started
     
-    This tool uses the <a href="https://developers.google.com/optimization?hl=de" target="_blank" rel="noopener noreferrer">Google OR-Tools</a> open‑source optimisation library.
+    This tool uses the Google OR-Tools open‑source optimisation library. https://developers.google.com/optimization?hl=de
     
     To begin, please follow these steps:
     
@@ -225,7 +225,6 @@ if not st.session_state['config_loaded']:
     4.  Review and adjust parameters – Use the Edit tab to fine-tune settings, duty counts, penalties, and constraints.
     5.  Run the scheduler – Click Generate Schedule and wait for the optimised plan.
     6.  Download the results – Obtain the generated schedule and the updated Rules.xlsx from the Downloads tab.
-    
     ---
     
     ### Data Privacy and Security

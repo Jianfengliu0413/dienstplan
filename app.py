@@ -69,6 +69,24 @@ st.markdown("""
         color: #1a1a2e;
         font-weight: 400;
     }
+    /* Compact file uploader */
+    [data-testid="stFileUploader"] {
+        padding: 0.2rem 0 !important;
+    }
+    [data-testid="stFileUploader"] > div {
+        padding: 0 !important;
+    }
+    [data-testid="stFileUploader"] .st-c8 {
+        padding: 0.2rem 0.5rem !important;
+        min-height: 2.5rem !important;
+    }
+    /* Also reduce the drag-drop area inside */
+    [data-testid="stFileUploader"] .st-b1 {
+        min-height: 2.5rem !important;
+    }
+    [data-testid="stFileUploader"] .st-b1 > div {
+        padding: 0.2rem !important;
+    }
     /* Buttons */
     .stButton button {
         background-color: #2E86C1;

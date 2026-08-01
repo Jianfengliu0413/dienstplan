@@ -13,11 +13,16 @@ import traceback
 
 st.set_page_config(page_title="Duty Scheduler", layout="wide")
 
-# Hide Streamlit branding
+# Hide Streamlit branding 
 hide_streamlit_style = """
     <style>
+    #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    .stAppDeployButton {display:none;}
+    .stAppDeployButton {display: none !important;}
+    /* Hide the GitHub icon specifically if it's outside the deploy button */
+    .stApp [data-testid="stToolbar"] {display: none;}
+    /* Hide the "View on GitHub" link if present */
+    .stApp [data-testid="stHeader"] {display: none;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)

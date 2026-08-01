@@ -29,12 +29,11 @@ def solve_schedule(
     num_doctors = len(doctors)
 
     # Load initial working hours
-    # try:
-    #     initial_hours = load_working_hours(config_path, doctors)
-    # except Exception as e:
-    #     print(f"failed to get the initial_hours from 'Rules file: {e}'")
-    #     initial_hours = {doc: 0.0 for doc in doctors}
-    initial_hours = {doc: 0.0 for doc in doctors}
+    try:
+        initial_hours = load_working_hours(config_path, doctors)
+    except Exception as e:
+        print(f"failed to get the initial_hours from 'Rules file: {e}'")
+        initial_hours = {doc: 0.0 for doc in doctors}
     # Create CP model
     model_cp = cp_model.CpModel()
     x = {}

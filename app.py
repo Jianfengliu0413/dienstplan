@@ -20,7 +20,14 @@ if 'initialized' not in st.session_state:
     st.session_state['initialized'] = True
     # We will also reset the editor keys by not setting them yet
     st.rerun()
-
+if st.sidebar.button("Clear All Data"):
+    # Delete temporary files
+    if st.session_state.get('rules_file_path') and os.path.exists(st.session_state['rules_file_path']):
+        os.unlink(st.session_state['rules_file_path'])
+    # Clear session state
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.rerun()
 # --- Hide Streamlit branding ---
 hide_streamlit_style = """
     <style>
@@ -49,26 +56,49 @@ st.sidebar.header("Upload Files")
 # We'll store the file paths in session state so they persist across reruns
 
 # Upload Rules.xlsx
-rules_file = st.sidebar.file_uploader("Upload Rules.xlsx", type=["xlsx"], key="rules_uploader")
+# rules_file = st.sidebar.file_uploader("Upload Rules.xlsx", type=["xlsx"], key="rules_uploader")
+# if rules_file is not None:
+#     # Save to temp file
+#     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_rules:
+#         tmp_rules.write(rules_file.getvalue())
+#         rules_path = tmp_rules.name
+#         # Store in session state
+#         st.session_state['rules_path'] = rules_path
+# else:
+#     # If no new file uploaded, check if we have a previous path
+#     if 'rules_path' in st.session_state and os.path.exists(st.session_state['rules_path']):
+#         rules_path = st.session_state['rules_path']
+#     else:
+#         # Fallback to default
+#         if os.path.exists("Rules.xlsx"):
+#             rules_path = "Rules.xlsx"
+#         else:
+#             st.error("Please upload Rules.xlsx")
+#             st.stop()
+# At the top, after session reset
+if 'config_loaded' not in st.session_state:
+    st.session_state['config_loaded'] = False
+    st.session_state['rules_file_path'] = None
+    st.session_state['uploaded_rules'] = None
+
+# In the file uploader section:
+rules_file = st.sidebar.file_uploader("Upload Rules.xlsx", type=["xlsx"])
 if rules_file is not None:
-    # Save to temp file
+    # Save to temporary file and set session state
     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_rules:
         tmp_rules.write(rules_file.getvalue())
         rules_path = tmp_rules.name
-        # Store in session state
-        st.session_state['rules_path'] = rules_path
+    st.session_state['rules_file_path'] = rules_path
+    st.session_state['config_loaded'] = True
+    st.session_state['uploaded_rules'] = rules_file.getvalue()  # store for later
 else:
-    # If no new file uploaded, check if we have a previous path
-    if 'rules_path' in st.session_state and os.path.exists(st.session_state['rules_path']):
-        rules_path = st.session_state['rules_path']
+    # If no file uploaded, check if we have a stored one
+    if st.session_state.get('rules_file_path') and os.path.exists(st.session_state['rules_file_path']):
+        rules_path = st.session_state['rules_file_path']
+        st.session_state['config_loaded'] = True
     else:
-        # Fallback to default
-        if os.path.exists("Rules.xlsx"):
-            rules_path = "Rules.xlsx"
-        else:
-            st.error("Please upload Rules.xlsx")
-            st.stop()
-
+        rules_path = None
+        st.session_state['config_loaded'] = False
 # Upload Template (Stationsplan)
 template_file = st.sidebar.file_uploader("Upload Template (Stationsplan)", type=["xlsx"])
 if template_file is not None:

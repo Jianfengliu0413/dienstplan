@@ -110,7 +110,7 @@ st.markdown("""
     footer {visibility: hidden;}
     .stDeployButton {display: none !important;}
     .stAppDeployButton {display: none !important;}
-    .stApp [data-testid="stToolbar"] {display: none;}
+    /* .stApp [data-testid="stToolbar"] {display: none;}/
     .stApp [data-testid="stHeader"] {display: none;}
     .stApp [data-testid="stHeaderManageApp"] {display: none !important;}
     .stApp [data-testid="stHeaderAppMenu"] {display: none !important;}

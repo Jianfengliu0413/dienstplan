@@ -103,7 +103,7 @@ except Exception as e:
     st.stop()
 
 # --- Tab 1: Run Scheduler ---
-with tab2:
+with tab1:
     st.subheader("Run Scheduler")
     output_file = st.text_input("Output File Name", "Stationsplan_out.xlsx")
 
@@ -166,7 +166,7 @@ with tab2:
         st.text_area("Log Output", st.session_state.log_output, height=300)
 
 # --- Tab 3: Downloads ---
-with tab3:
+with tab2:
     st.subheader("Download Files")
 
     if 'output_file' in st.session_state and st.session_state['output_file']:

@@ -21,7 +21,24 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+# --- Hide Streamlit branding ---
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display: none !important;}
+    .stAppDeployButton {display: none !important;}
+    .stApp [data-testid="stToolbar"] {display: none;}
+    .stApp [data-testid="stHeader"] {display: none;}
+    .stApp [data-testid="stHeaderManageApp"] {display: none !important;}
+    .stApp [data-testid="stHeaderAppMenu"] {display: none !important;}
+    /* Hide the "Manage app" dropdown and button */
+    .st-emotion-cache-1v0mbdj {display: none !important;}
+    .st-emotion-cache-1r6slb0 {display: none !important;}
+    </style>
+"""
 
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 # --- Custom CSS for modern look ---
 st.markdown("""
 <style>
@@ -153,7 +170,7 @@ if not st.session_state['config_loaded']:
     **To get started:**
     1. Upload your **Rules.xlsx** file in the sidebar.
     2. Upload the monthly **Template** (Stationsplan).
-    3. Optionally upload a **Wishes** file for doctor preferences.
+    3. Optionally upload a **Wishes** file for doctor preferences (wishes).
     4. Review/edit parameters, then click **Generate Schedule**.
     5. Download the output schedule and updated rules.
     """)

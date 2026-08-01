@@ -49,23 +49,25 @@ st.markdown("""
     }
     .sidebar-logo {
         text-align: center;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
+        padding-top: 0.2rem;
     }
     .sidebar-logo h2 {
         color: #1a1a2e;
         font-weight: 700;
-        font-size: 1.5rem;
+        font-size: 1.2rem;
         margin: 0;
+        line-height:1.2;
     }
     .sidebar-logo p {
         color: #6c757d;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         margin: 0;
     }
     /* Headers */
     h1, h2, h3 {
         color: #1a1a2e;
-        font-weight: 600;
+        font-weight: 400;
     }
     /* Buttons */
     .stButton button {

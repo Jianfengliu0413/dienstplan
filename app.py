@@ -266,8 +266,8 @@ if not st.session_state['config_loaded']:
     # st.markdown('<div class="custom-card">', unsafe_allow_html=True)
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">
-        <h1 style="color: #1a1a2e; font-weight: 700; font-size: 1.8rem; margin: 0.2rem 0;">UKT IM2 Dienstplan</h1>
-        <hr style="width: 60px; border: 2px solid #2E86C1; margin: 0.3rem auto;">
+        <h3 style="color: #1a1a2e; font-weight: 700; font-size: 1.8rem; margin: 0.2rem 0;">UKT IM2 Dienstplan</h3>
+        <hr style="width: 60px; border: 2px solid #2E86C1; margin: 0rem auto;">
     </div>
     """, unsafe_allow_html=True)
     

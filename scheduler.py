@@ -101,7 +101,43 @@ def create_default_config(config_path: str):
             'Value': ['Yes', 'Yes', 'Yes']
         })
         output.to_excel(writer, sheet_name='OutputOptions', index=False)
-
+def get_default_station_code_map() -> pd.DataFrame:
+    data = [
+        ("1", "65 PP"),
+        ("2", "65 LAF"),
+        ("3", "85 Häm/Onk/Rheu"),
+        ("4", "92 KMT"),
+        ("5", "64 TK PP"),
+        ("6", "64 TK Kasse"),
+        ("7", "Sonographie"),
+        ("8", "Amb 1 (Lymphom/allgemein)"),
+        ("9", "Amb 2 (allgemein/Gerinnung)"),
+        ("10", "Amb 3 (spezialisiert mix)"),
+        ("11", "Amb 4 (Myelom)"),
+        ("12", "KMT 1"),
+        ("13", "KMT 2"),
+        ("14", "Rheuma 1"),
+        ("15", "Rheuma 2"),
+        ("16", "Rheuma 3"),
+        ("17", "INDIRA"),
+        ("17a", "GBA-Rheumazentrum 50 %"),
+        ("18", "Leukapherese"),
+        ("19", "Sprechstunde PP/Oberärzte"),
+        ("20", "Springer/Konsile/Diagnostik"),
+        ("21", "Balingen"),
+        ("22", "Forschung"),
+        ("23", "Labor"),
+        ("24", "93 (3 IS)"),
+        ("25", "Rotation Med I"),
+        ("28", "Aufnahme"),
+        ("25-copy", "Rotation"),
+        ("92", "92 KMT"),
+        ("85", "85 Häm/Onk/Rheu"),
+        ("65p", "65 PP"),
+        ("65", "65 LAF"),
+        ("999", "Elternzeit"),
+    ]
+    return pd.DataFrame(data, columns=["Code", "Station"])
 def write_missing_config_sheets(model: ScheduleModel, config_path: str):
     from openpyxl import load_workbook
     import pandas as pd
@@ -196,6 +232,11 @@ def write_missing_config_sheets(model: ScheduleModel, config_path: str):
                                   dt.priority])
             df_duty = pd.DataFrame(duty_data, columns=['Abbr', 'FullName', 'RequiresSenior', 'WeekendOnly', 'Priority'])
             df_duty.to_excel(writer, sheet_name='DutyTypes', index=False)
+
+        # --- Create StationCodeMap if missing ---
+        if 'StationCodeMap' not in wb.sheetnames:
+            df_map = get_default_station_code_map()
+            df_map.to_excel(writer, sheet_name='StationCodeMap', index=False)
 
         # Other required sheets (if missing)
         required_sheets = {

@@ -186,7 +186,7 @@ with tab3:
     if 'output_file' in st.session_state and os.path.exists(st.session_state['output_file']):
         with open(st.session_state['output_file'], "rb") as f:
             st.download_button(
-                label="📊 Download Generated Schedule",
+                label="Download Generated Schedule",
                 data=f,
                 file_name=os.path.basename(st.session_state['output_file']),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

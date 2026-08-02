@@ -366,9 +366,7 @@ with tab1:
         st.metric("Duty Types", len(duties))
     
     output_file = st.text_input("Output filename", "Stationsplan_out.xlsx")
-    if st.button("Reload Configuration"):
-        st.session_state['config'] = load_config(RULES_FILE)
-        st.rerun()
+
     if st.button("Generate Schedule", use_container_width=True):
         with st.spinner("Generating schedule..."):
             try:

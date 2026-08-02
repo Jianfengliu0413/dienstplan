@@ -349,15 +349,18 @@ with tab1:
     if st.button("Generate Schedule", use_container_width=True):
         with st.spinner("Generating schedule..."):
             try:
-                template_path = st.session_state['template_path']
-                if template_path is None:
-                    settings_df = config.get("Settings", pd.DataFrame())
-                    if not settings_df.empty:
-                        template_path = settings_df[settings_df["Setting"] == "TemplateFile"]["Value"].values[0]
-                    else:
-                        st.error("Template file not found. Please upload one.")
-                        st.stop()
-                
+                # template_path = st.session_state['template_path']
+                # if template_path is None:
+                #     settings_df = config.get("Settings", pd.DataFrame())
+                #     if not settings_df.empty:
+                #         template_path = settings_df[settings_df["Setting"] == "TemplateFile"]["Value"].values[0]
+                #     else:
+                #         st.error("Template file not found. Please upload one.")
+                #         st.stop()
+                template_path = st.session_state.get('template_path')
+                if template_path is None or not os.path.exists(template_path):
+                    st.error("please upload a valid Template file (Stationsplan) in the sidebar.")
+                    st.stop()
                 settings_df = config.get("Settings", pd.DataFrame()).copy()
                 settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
                 settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file

@@ -334,14 +334,17 @@ with tab1:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
     st.markdown("### Generate Schedule")
     
+    # Use the latest config from session state
+    current_config = st.session_state.get('config', config)
+    
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Doctors", len(config.get("Doctors", pd.DataFrame())))
+        st.metric("Doctors", len(current_config.get("Doctors", pd.DataFrame())))
     with col2:
-        stations = config.get("Stations", pd.DataFrame())
+        stations = current_config.get("Stations", pd.DataFrame())
         st.metric("Stations", len(stations))
     with col3:
-        duties = config.get("DutyTypes", pd.DataFrame())
+        duties = current_config.get("DutyTypes", pd.DataFrame())
         st.metric("Duty Types", len(duties))
     
     output_file = st.text_input("Output filename", "Stationsplan_out.xlsx")
@@ -349,19 +352,12 @@ with tab1:
     if st.button("Generate Schedule", use_container_width=True):
         with st.spinner("Generating schedule..."):
             try:
-                # template_path = st.session_state['template_path']
-                # if template_path is None:
-                #     settings_df = config.get("Settings", pd.DataFrame())
-                #     if not settings_df.empty:
-                #         template_path = settings_df[settings_df["Setting"] == "TemplateFile"]["Value"].values[0]
-                #     else:
-                #         st.error("Template file not found. Please upload one.")
-                #         st.stop()
                 template_path = st.session_state.get('template_path')
                 if template_path is None or not os.path.exists(template_path):
-                    st.error("please upload a valid Template file (Stationsplan) in the sidebar.")
+                    st.error("Please upload a valid Template file (Stationsplan) in the sidebar.")
                     st.stop()
-                settings_df = config.get("Settings", pd.DataFrame()).copy()
+                
+                settings_df = current_config.get("Settings", pd.DataFrame()).copy()
                 settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
                 settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
                 if st.session_state.get('wishes_path'):
@@ -369,7 +365,7 @@ with tab1:
                 
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
                     with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
-                        for sheet, df in config.items():
+                        for sheet, df in current_config.items():
                             if sheet == "Settings":
                                 settings_df.to_excel(writer, sheet_name=sheet, index=False)
                             else:
@@ -387,7 +383,6 @@ with tab1:
                     st.session_state['log_output'] = log_output
                 else:
                     st.error(f"Scheduler failed. Log:\n{log_output}")
- 
                 os.unlink(updated_rules)
                 
             except Exception as e:
@@ -402,7 +397,7 @@ with tab2:
     st.markdown("### Parameters Editor")
     st.caption("Edit your configuration tables. Changes are saved to the Rules.xlsx file.")
 
-    all_sheets = list(config.keys())
+    all_sheets = list(current_config.keys())
     if not all_sheets:
         st.error("❌ No sheets found in the configuration file. Please upload a valid Rules.xlsx.")
         st.stop()
@@ -411,7 +406,6 @@ with tab2:
     if 'edit_version' not in st.session_state:
         st.session_state['edit_version'] = version_key
     elif st.session_state['edit_version'] != version_key:
-        # File has changed, clear all editor keys
         for key in list(st.session_state.keys()):
             if key.startswith('editor_'):
                 del st.session_state[key]
@@ -421,41 +415,36 @@ with tab2:
         expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
         with st.expander(f"{sheet_name}", expanded=expanded):
             editor_key = f"editor_{sheet_name}"
-            initial_df = config[sheet_name].copy().fillna("")
-            # Use session state if available, else initial
+            initial_df = current_config[sheet_name].copy().fillna("")
             edited_df = st.data_editor(
                 st.session_state.get(editor_key, initial_df),
                 key=editor_key,
                 use_container_width=True,
                 num_rows="dynamic"
             )
-            # The widget updates st.session_state[editor_key] automatically
+            # widget updates st.session_state[editor_key]
 
     if st.button("Save All Changes", use_container_width=True):
         try:
-            # Write all sheets to the file
-            with pd.ExcelWriter(st.session_state['rules_file_path'], engine='openpyxl', mode='w') as writer:
+            file_path = st.session_state['rules_file_path']
+            with pd.ExcelWriter(file_path, engine='openpyxl', mode='w') as writer:
                 for sheet_name in all_sheets:
                     editor_key = f"editor_{sheet_name}"
-                    # Get the edited DataFrame or fallback to original config
                     df = st.session_state.get(editor_key)
                     if df is None or not isinstance(df, pd.DataFrame):
-                        df = config[sheet_name].copy().fillna("")
+                        df = current_config[sheet_name].copy().fillna("")
                     if not isinstance(df, pd.DataFrame):
                         df = pd.DataFrame(df)
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
             st.success("✅ Changes saved successfully!")
 
             # Reload config and update session state
-            st.session_state['config'] = load_config(st.session_state['rules_file_path'])
-            config = st.session_state['config']
-
-            # Delete all editor keys so they re-initialise from the new config on next run
+            st.session_state['config'] = load_config(file_path)
+            # Delete editor keys so they re-initialise from the new config
             for sheet_name in all_sheets:
                 editor_key = f"editor_{sheet_name}"
                 if editor_key in st.session_state:
                     del st.session_state[editor_key]
-
             st.rerun()
         except Exception as e:
             st.error(f"❌ Save failed: {e}")

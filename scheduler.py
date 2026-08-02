@@ -374,6 +374,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
         return None
 
     config = load_config(config_path)
+    print(f"[DEBUG] Config loaded from: {config_path}")
     settings = config['Settings'].set_index('Setting')['Value'].to_dict()
 
     template_file = template_file or settings.get('TemplateFile', '/Users/macjianfeng/Dropbox/github/python/dienstplan/data/external/templates/Stationsplan Oktober 26.xlsx')
@@ -386,14 +387,14 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
     # Parse
     schedule = parse_template(template_file, config, wishes_path=wishes_file)
 
-    # # Always write detected doctors and stations back to Rules.xlsx
-    # write_missing_config_sheets(schedule, config_path)
-    # write_skills_auto(schedule, config_path)
-    # print("Doctors and Stations sheets updated from template.")
+    # Always write detected doctors and stations back to Rules.xlsx
+    write_missing_config_sheets(schedule, config_path)
+    write_skills_auto(schedule, config_path)
+    print("Doctors and Stations sheets updated from template.")
 
     # Reload config: to pick up the newly written sheets
     config = load_config(config_path)   # now the Doctors sheet reflects the template
-
+    print(f"[DEBUG] Config loaded from: {config_path}")
     # Update schedule's duty_types from the reloaded config
     duty_cfg = config.get('DutyTypes', pd.DataFrame())
     if not duty_cfg.empty:
@@ -430,14 +431,14 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
         other_errors = [e for e in errors if 'no skills defined' not in e and 'no duty demand' not in e]
 
         if (missing_skills or missing_demand) and not other_errors:
-            # print("Configuration incomplete: missing skills and/or station duty counts.")
-            # print("Generating missing sheets with detected doctors and stations...")
-            # write_missing_config_sheets(schedule, config_path)
-            # write_skills_auto(schedule, config_path)
-            # print("\nPlease open Rules.xlsx and fill in:")
-            # print("  - Skills sheet: assign each doctor their duty types (SD, ZD, KM, etc.)")
-            # print("  - Stations sheet: add DutyCounts (e.g., 'SD=2, ZD=1, KM=1')")
-            # print("Then re-run the script.")
+            print("Configuration incomplete: missing skills and/or station duty counts.")
+            print("Generating missing sheets with detected doctors and stations...")
+            write_missing_config_sheets(schedule, config_path)
+            write_skills_auto(schedule, config_path)
+            print("\nPlease open Rules.xlsx and fill in:")
+            print("  - Skills sheet: assign each doctor their duty types (SD, ZD, KM, etc.)")
+            print("  - Stations sheet: add DutyCounts (e.g., 'SD=2, ZD=1, KM=1')")
+            print("Then re-run the script.")
             return
         else:
             print("Validation errors:")

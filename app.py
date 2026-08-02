@@ -303,10 +303,10 @@ if not st.session_state['config_loaded']:
     ### Getting Started
     This tool uses the Google OR-Tools open‑source library. https://developers.google.com/optimization?hl=de
     To begin, please follow these steps:
-    1.  Upload your configuration – Provide your Rules.xlsx file in the sidebar. This file contains all department rules, doctor lists, stations, duty types, and constraints.
-    2.  Upload the monthly template – The Stationsplan Excel file for the target month (e.g., xxxstationsplanxxx.xlsx).
-    3.  Upload wishes – If you have a Wishes.xlsx file with doctor preferences, upload it as well.
-    4.  Review and adjust parameters – Use the Edit tab to fine-tune settings, duty counts, penalties, and constraints.
+    1.  Upload your configuration –- Rules.xlsx file in the sidebar. This file contains all rules, doctors, stations, duties ...
+    2.  Upload the monthly template –- The Stationsplan Excel file for the target month (e.g., xxxstationsplanxxx.xlsx).
+    3.  Upload doctor's wishes – (optional).
+    4.  Review and adjust parameters – Use the Edit tab to fine-tune settings...
     5.  Run the scheduler – Click Generate Schedule and wait for the optimised plan.
     6.  Download the results – Obtain the generated schedule and the updated Rules.xlsx from the Downloads tab.
     """)
@@ -317,8 +317,7 @@ if not st.session_state['config_loaded']:
     This application uses the <a href="https://developers.google.com/optimization?hl=de" target="_blank" rel="noopener noreferrer">Google OR-Tools</a> open‑source optimisation library.
     </div>
     """, unsafe_allow_html=True)
-    
-    # st.markdown('</div>', unsafe_allow_html=True)
+
     st.stop()
 
 # Load config

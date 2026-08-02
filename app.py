@@ -401,30 +401,25 @@ with tab2:
     all_sheets = list(config.keys())
 
     # Clear editor session state keys when a new file is uploaded
-    # We'll use a version number that increments on file upload
-    # We can use the file hash as a version indicator, but we want stable keys for the same file.
-    # Simpler: on file upload, clear all edit_* keys.
-    # We'll check if a new file was uploaded by comparing file hashes.
     current_hash = hashlib.md5(st.session_state['rules_file_path'].encode()).hexdigest()
     if 'last_file_hash' not in st.session_state:
         st.session_state['last_file_hash'] = None
     if st.session_state['last_file_hash'] != current_hash:
         # Clear old editor keys
         for key in list(st.session_state.keys()):
-            if key.startswith('edit_'):
+            if key.startswith('editor_'):
                 del st.session_state[key]
         st.session_state['last_file_hash'] = current_hash
 
     for sheet_name in all_sheets:
         expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
         with st.expander(f"{sheet_name}", expanded=expanded):
-            editor_key = f"edit_{sheet_name}"
+            editor_key = f"editor_{sheet_name}"
             # Initialize session state for this sheet if not present
             if editor_key not in st.session_state:
                 st.session_state[editor_key] = config[sheet_name].copy().fillna("")
-            # Use the session state value as the data source
+            # Use only the key – the widget reads/writes to session_state[editor_key]
             edited_df = st.data_editor(
-                st.session_state[editor_key],
                 key=editor_key,
                 use_container_width=True,
                 num_rows="dynamic"
@@ -435,7 +430,7 @@ with tab2:
         try:
             with pd.ExcelWriter(st.session_state['rules_file_path'], engine='openpyxl', mode='w') as writer:
                 for sheet_name in all_sheets:
-                    editor_key = f"edit_{sheet_name}"
+                    editor_key = f"editor_{sheet_name}"
                     df = st.session_state.get(editor_key)
                     if df is not None:
                         df.to_excel(writer, sheet_name=sheet_name, index=False)
@@ -447,7 +442,7 @@ with tab2:
             config = st.session_state['config']
             # Update the editor session states with the saved data
             for sheet_name in all_sheets:
-                editor_key = f"edit_{sheet_name}"
+                editor_key = f"editor_{sheet_name}"
                 if editor_key in st.session_state:
                     st.session_state[editor_key] = config[sheet_name].copy().fillna("")
             st.rerun()
@@ -455,7 +450,6 @@ with tab2:
             st.error(f"❌ Save failed: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
-
 
 # -------- TAB 3: DOWNLOADS --------
 with tab3:

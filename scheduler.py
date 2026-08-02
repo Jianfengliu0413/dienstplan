@@ -286,6 +286,76 @@ def write_skills_auto(model: ScheduleModel, config_path: str):
     print("Generated 'Skills-Auto' sheet with all doctors × all duty types.")
     print("   Copy the rows you need into the 'Skills' sheet and delete the rest.")
 
+def generate_day_off_suggestions(
+    schedule: ScheduleModel,
+    assignment: Dict[int, str],
+    duties: List[Tuple[int, str, str]],
+    doctors: List[str],
+    duty_hours: List[float],
+    initial_hours: Dict[str, float],
+    final_hours: Dict[str, float]
+) -> pd.DataFrame:
+    """
+    For each part‑time doctor (FTE < 100), suggest removing some blank weekdays
+    to bring total hours closer to the FTE‑based target.
+    Returns a DataFrame with: Doctor, Current Hours, Target Hours, Excess, Suggested Days.
+    """
+    rows = []
+    total_month_hours = sum(duty_hours)
+    total_initial_hours = sum(initial_hours.values())
+    total_fte = sum(doc.fte for doc in schedule.doctors.values()) / 100.0
+    weekday_indices = [idx for idx, day in enumerate(schedule.days) if not day.is_weekend]
+
+    # Build set of assigned days per doctor
+    assigned_days = {doc: set() for doc in doctors}
+    for i, doc_name in assignment.items():
+        day_idx = duties[i][0]
+        assigned_days[doc_name].add(day_idx)
+
+    for doc_name in doctors:
+        doc = schedule.doctors[doc_name]
+        if doc.fte >= 100:
+            continue  # only part‑time
+
+        # Target final hours based on FTE
+        target_final = (total_initial_hours + total_month_hours) * (doc.fte / 100) / total_fte if total_fte > 0 else 0
+        current_hours = final_hours.get(doc_name, 0.0)
+        excess = current_hours - target_final
+
+        if excess <= 0:
+            continue  # no need to suggest
+
+        # Find blank weekdays (no duty, not unavailable, not light‑green)
+        blank_days = []
+        for day_idx in weekday_indices:
+            if (doc_name, day_idx) not in schedule.unavailable and day_idx not in assigned_days[doc_name]:
+                # Also skip if light‑green (day‑off preference)
+                if hasattr(schedule, 'soft_unavailable') and (doc_name, day_idx) in schedule.soft_unavailable:
+                    continue
+                blank_days.append(day_idx)
+
+        if not blank_days:
+            continue
+
+        # Suggest removing enough blank days to bring excess to zero
+        hours_per_day = 8.5
+        days_to_remove = int(excess / hours_per_day) + 1
+        suggested_days = blank_days[:days_to_remove]
+
+        # Convert day indices to date strings
+        suggested_date_strs = [schedule.days[d].date.strftime('%Y-%m-%d') for d in suggested_days]
+
+        rows.append({
+            'Doctor': doc_name,
+            'FTE (%)': doc.fte,
+            'Current Hours': round(current_hours, 1),
+            'Target Hours': round(target_final, 1),
+            'Excess Hours': round(excess, 1),
+            'Suggested Days Off': ', '.join(suggested_date_strs)
+        })
+
+    return pd.DataFrame(rows)
+
 def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_file=None):
     """
     Run the scheduler with given file paths.
@@ -410,11 +480,14 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
             + normal_days * normal_hours
         )
 
-
+    # Generate day-off suggestions
+    suggestions_df = generate_day_off_suggestions(
+        schedule, assignment, duties, doctors, duty_hours, initial_hours, final_hours
+    )
     # Write to WorkingHours sheet
     write_working_hours(config_path, final_hours)
     # Write
-    write_output(template_file, output_file, schedule, assignment, duties, doctors, config, solver)
+    write_output(template_file, output_file, schedule, assignment, duties, doctors, config, solver, suggestions_df)
 
     print(f"Schedule generated: {output_file}")
     try:

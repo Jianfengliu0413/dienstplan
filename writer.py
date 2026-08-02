@@ -15,7 +15,8 @@ def write_output(
     duties: List[Tuple[int, str, str]],
     doctors: List[str],
     config: dict,
-    solver
+    solver,
+    suggestions_df: pd.DataFrame = None
 ) -> None:
     wb = openpyxl.load_workbook(template_path)
     sheet_name = getattr(schedule, 'sheet_name', None)
@@ -134,6 +135,10 @@ def write_output(
         explain_df.to_excel(writer, sheet_name='Explanation', index=False)
 
     wb.save(output_path)
+
+    if suggestions_df is not None and not suggestions_df.empty:
+        with pd.ExcelWriter(output_path, engine='openpyxl', mode='a') as writer:
+            suggestions_df.to_excel(writer, sheet_name='DayOffSuggestions', index=False)
 
 
 def add_compensatory_sd(

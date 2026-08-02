@@ -346,6 +346,14 @@ with tab1:
     # Use the latest config from session state
     current_config = st.session_state.get('config', config)
     
+    # --- DEBUG: Show all sheets in the current config ---
+    with st.expander("🔍 Debug: Show all sheets in current_config", expanded=False):
+        st.write("**Sheet names and first rows:**")
+        for sheet_name in sorted(current_config.keys()):
+            st.write(f"**{sheet_name}**")
+            df = current_config[sheet_name]
+            st.dataframe(df.head(3))
+     
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Doctors", len(current_config.get("Doctors", pd.DataFrame())))
@@ -475,6 +483,19 @@ with tab2:
                     ws.append(r)
 
             wb.save(file_path)
+
+
+            # --- DEBUG: Show all sheets in the saved file ---
+            debug_config = load_config(file_path)
+            st.success(f"File saved successfully!")
+            with st.expander("🔍 Debug: Saved file content", expanded=True):
+                st.write(f"**File path:** {file_path}")
+                for sheet_name in sorted(debug_config.keys()):
+                    st.write(f"**{sheet_name}**")
+                    df = debug_config[sheet_name]
+                    st.dataframe(df.head(3))
+
+
             st.success("Changes saved successfully!")
 
             st.session_state['config'] = load_config(file_path)

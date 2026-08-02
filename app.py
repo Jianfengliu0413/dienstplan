@@ -387,6 +387,10 @@ with tab1:
                         st.dataframe(stations_df)
                     except Exception as e:
                         st.warning(f"Could not read Stations sheet for debug: {e}")
+
+
+                st.subheader("Debug: Stations sheet in current_config")
+                st.dataframe(current_config.get('Stations', pd.DataFrame()))
                 wishes = st.session_state.get('wishes_path')
 
                 # Use the current_config dict directly to avoid file I/O issues

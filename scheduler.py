@@ -363,19 +363,26 @@ def generate_day_off_suggestions(
 
     return pd.DataFrame(rows)
 
-def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_file=None):
+def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_file=None, config_dict=None):
     """
     Run the scheduler with given file paths.
     If a path is None, it will be read from Settings sheet.
     """
+    if config_dict is not None:
+        config = config_dict
+        print("[DEBUG] Using config_dict directly")
+    else:
+        if not os.path.exists(config_path):
+            create_default_config(config_path)
+            print(f"Created default config at {config_path}")
+            return None
+        config = load_config(config_path)
+        print(f"[DEBUG] Config loaded from {config_path}")
     # config_path = 'Rules.xlsx'
     if not os.path.exists(config_path):
         create_default_config(config_path)
         print(f"Created default configuration at {config_path}. Please adjust and re-run.")
-        return None
-
-    config = load_config(config_path)
-    print(f"[DEBUG] Config loaded from: {config_path}")
+        return None 
     settings = config['Settings'].set_index('Setting')['Value'].to_dict()
 
     template_file = template_file or settings.get('TemplateFile', '/Users/macjianfeng/Dropbox/github/python/dienstplan/data/external/templates/Stationsplan Oktober 26.xlsx')

@@ -329,7 +329,7 @@ except Exception as e:
 # --- Tabs ---
 tab1, tab2, tab3 = st.tabs(["Run", "Edit", "Downloads"])
 
-# -------- TAB 1: RUN --------
+ # -------- TAB 1: RUN --------
 with tab1:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
     st.markdown("### Generate Schedule")
@@ -357,37 +357,37 @@ with tab1:
                     st.error("Please upload a valid Template file (Stationsplan) in the sidebar.")
                     st.stop()
                 
+                # Use the exact same Rules file that was edited
+                rules_file_path = st.session_state['rules_file_path']
+                st.info(f"📂 Using Rules file: {rules_file_path}")
+
+                # Update Settings sheet in the rules file with current template and output paths
                 settings_df = current_config.get("Settings", pd.DataFrame()).copy()
                 settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
                 settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
                 if st.session_state.get('wishes_path'):
                     settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = st.session_state['wishes_path']
                 
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-                    with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
-                        for sheet, df in current_config.items():
-                            if sheet == "Settings":
-                                settings_df.to_excel(writer, sheet_name=sheet, index=False)
-                            else:
-                                df.to_excel(writer, sheet_name=sheet, index=False)
-                    updated_rules = tmp.name
-
+                # Write the updated Settings sheet back to the same file
+                # Use mode='a' with if_sheet_exists='replace' to overwrite only the Settings sheet
+                with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                    settings_df.to_excel(writer, sheet_name="Settings", index=False)
+                
+                # Now run the scheduler with the same file
                 wishes = st.session_state.get('wishes_path')
-                # Pass the temporary file directly – no need to copy to "Rules.xlsx"
-                success, log_output = run_scheduler(template_path, output_file, updated_rules, wishes)
+                success, log_output = run_scheduler(template_path, output_file, rules_file_path, wishes)
+                
                 if success:
-                    st.success("Schedule generated successfully")
+                    st.success("Schedule generated successfully!")
                     st.session_state['output_file'] = output_file
                     st.session_state['log_output'] = log_output
                 else:
                     st.error(f"Scheduler failed. Log:\n{log_output}")
-                os.unlink(updated_rules)
                 
             except Exception as e:
                 st.error(f"Error: {e}")
                 st.code(traceback.format_exc(), language="python")
     st.markdown('</div>', unsafe_allow_html=True)
- 
 
 # -------- TAB 2: EDIT --------
 with tab2:
@@ -397,7 +397,7 @@ with tab2:
 
     all_sheets = list(current_config.keys())
     if not all_sheets:
-        st.error("❌ No sheets found in the configuration file. Please upload a valid Rules.xlsx.")
+        st.error("No sheets found in the configuration file. Please upload a valid Rules.xlsx.")
         st.stop()
 
     version_key = hashlib.md5(st.session_state['rules_file_path'].encode()).hexdigest()

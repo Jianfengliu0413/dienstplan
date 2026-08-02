@@ -223,7 +223,7 @@ with st.sidebar:
     
     # st.markdown("---")
     
-    st.markdown("### Upload Files")
+    st.markdown("### Upload Files (click or drag files)")
     
     rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
     if rules_file is not None:

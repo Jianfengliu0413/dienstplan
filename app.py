@@ -395,6 +395,7 @@ with tab1:
                 st.code(traceback.format_exc(), language="python")
     st.markdown('</div>', unsafe_allow_html=True)
 
+
 # -------- TAB 2: EDIT --------
 with tab2:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
@@ -432,30 +433,29 @@ with tab2:
 
     if st.button("Save All Changes", use_container_width=True):
         try:
-            file_path = st.session_state['rules_file_path']
-            # Use mode='w' to overwrite the entire file
-            with pd.ExcelWriter(file_path, engine='openpyxl', mode='w') as writer:
+            # Write all sheets to the file
+            with pd.ExcelWriter(st.session_state['rules_file_path'], engine='openpyxl', mode='w') as writer:
                 for sheet_name in all_sheets:
                     editor_key = f"editor_{sheet_name}"
-                    # Get the edited DataFrame or fallback
+                    # Get the edited DataFrame or fallback to original config
                     df = st.session_state.get(editor_key)
                     if df is None or not isinstance(df, pd.DataFrame):
-                        # Fallback to original config
                         df = config[sheet_name].copy().fillna("")
-                    # Ensure it's a DataFrame
                     if not isinstance(df, pd.DataFrame):
                         df = pd.DataFrame(df)
-                    # Write the sheet
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
             st.success("✅ Changes saved successfully!")
+
             # Reload config and update session state
             st.session_state['config'] = load_config(st.session_state['rules_file_path'])
             config = st.session_state['config']
-            # Update the editor session states with the saved data
+
+            # Delete all editor keys so they re-initialise from the new config on next run
             for sheet_name in all_sheets:
                 editor_key = f"editor_{sheet_name}"
                 if editor_key in st.session_state:
-                    st.session_state[editor_key] = config[sheet_name].copy().fillna("")
+                    del st.session_state[editor_key]
+
             st.rerun()
         except Exception as e:
             st.error(f"❌ Save failed: {e}")

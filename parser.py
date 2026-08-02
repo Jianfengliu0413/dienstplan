@@ -474,7 +474,7 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                             rgb_str = color.rgb
                             if len(rgb_str) == 8:
                                 rgb_str = rgb_str[2:]
-                            print(f"Cell ({row}, {col}) RGB: {rgb_str}")
+                            # print(f"Cell ({row}, {col}) RGB: {rgb_str}") # debug
                             if is_dark_green(rgb_str):
                                 is_dark = True
                             elif is_light_green(rgb_str):
@@ -483,7 +483,7 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                     pass
 
                 if is_dark or (rgb_str and is_dark_green(rgb_str)):
-                    print("  -> DARK GREEN detected")
+                    # print("  -> DARK GREEN detected") # debug
                     is_fixed = True
                     is_unavailable = True
                 elif is_light or (rgb_str and is_light_green(rgb_str)):

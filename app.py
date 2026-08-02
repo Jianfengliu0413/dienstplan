@@ -292,13 +292,14 @@ if not st.session_state['config_loaded']:
     """)
     
     st.info("Once you upload a valid Rules.xlsx file, this page will be replaced with the full featured interface.")
-    
-    st.markdown("""
+    st.info("""
     ### Data Privacy and Security
     - All file uploads are processed locally in your browser and not stored on any external server.
     - Temporary files are automatically deleted after your session ends.
     - This application is not connected to any external databases or cloud storage.
-    - For any technical issues, please contact JF (TEL: xxxxx61369).
+    - For any technical issues, please contact JF (TEL: xxxxx61369).""")
+    
+    st.markdown("""
     ### Getting Started
     This tool uses the Google OR-Tools open‑source library. https://developers.google.com/optimization?hl=de
     To begin, please follow these steps:

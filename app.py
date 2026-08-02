@@ -371,12 +371,10 @@ with tab1:
                             else:
                                 df.to_excel(writer, sheet_name=sheet, index=False)
                     updated_rules = tmp.name
-                
-                shutil.copy(updated_rules, "Rules.xlsx")
+
                 wishes = st.session_state.get('wishes_path')
-                if wishes:
-                    shutil.copy(wishes, "wishes.xlsx")
-                success, log_output = run_scheduler(template_path, output_file, "Rules.xlsx", wishes)
+                # Pass the temporary file directly – no need to copy to "Rules.xlsx"
+                success, log_output = run_scheduler(template_path, output_file, updated_rules, wishes)
                 if success:
                     st.success("Schedule generated successfully")
                     st.session_state['output_file'] = output_file

@@ -376,10 +376,10 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
     config = load_config(config_path)
     settings = config['Settings'].set_index('Setting')['Value'].to_dict()
 
-    template_file = settings.get('TemplateFile', '/Users/macjianfeng/Dropbox/github/python/dienstplan/data/external/templates/Stationsplan Oktober 26.xlsx')
-    output_file = settings.get('OutputFile', 'Stationsplan_October_2026_out.xlsx')
+    template_file = template_file or settings.get('TemplateFile', '/Users/macjianfeng/Dropbox/github/python/dienstplan/data/external/templates/Stationsplan Oktober 26.xlsx')
+    output_file = output_file or settings.get('OutputFile', 'Stationsplan_October_2026_out.xlsx')
 
-    wishes_file = settings.get('WishesFile', None)
+    wishes_file = wishes_file or settings.get('WishesFile', None)
     if wishes_file and not os.path.exists(wishes_file):
         print(f"Warning: WishesFile '{wishes_file}' not found. Proceeding without wishes.")
         wishes_file = None

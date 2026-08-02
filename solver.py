@@ -95,6 +95,13 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
     Repair: relax skill constraints only. Keep station match, vacation, and weekend rules.
     If still infeasible, raise error (user must reduce demand).
     """
+
+    general_df = config.get('GeneralRules', pd.DataFrame())
+    if not general_df.empty and 'RuleName' in general_df.columns:
+        general = general_df.set_index('RuleName')['Value'].to_dict()
+    else:
+        general = {}
+
     constraints_cfg = config.get('Constraints', pd.DataFrame())
     if not constraints_cfg.empty and 'Constraint' in constraints_cfg.columns:
         constraints_cfg = constraints_cfg.set_index('Constraint')['Enabled'].to_dict()
@@ -189,6 +196,8 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
                         model_cp.Add(x[(i, j)] == 0)
 
     # Max one weekend per doctor
+    # Max weekend duties per doctor (read from GeneralRules)
+    max_weekend_per_doctor = int(general.get('MaxWeekendPerDoctor', 1))
     if constraints_cfg.get('MaxOneWeekendPerDoctor', 'Yes') == 'Yes':
         for j in range(num_doctors):
             weekend_duties_for_doctor = []
@@ -196,7 +205,7 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
                 if schedule.days[day_idx].is_weekend:
                     weekend_duties_for_doctor.append(x[(i, j)])
             if weekend_duties_for_doctor:
-                model_cp.Add(sum(weekend_duties_for_doctor) <= 1)
+                model_cp.Add(sum(weekend_duties_for_doctor) <= max_weekend_per_doctor) # hardcoded 1 ?
 
     # Add soft constraints (including KMBalance and preferences)
     penalties = add_soft_constraints(model_cp, schedule, config, x, duties, doctors, demand, duty_hours, initial_hours)

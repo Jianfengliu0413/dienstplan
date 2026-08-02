@@ -392,50 +392,6 @@ with tab1:
                 st.code(traceback.format_exc(), language="python")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# # -------- TAB 2: EDIT --------
-# with tab2:
-#     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-#     st.markdown("### Parameters Editor")
-#     st.caption("Edit your configuration tables. Changes are saved to the Rules.xlsx file.")
-
-#     all_sheets = list(config.keys())
-#     file_hash = hashlib.md5(st.session_state['rules_file_path'].encode()).hexdigest()
-
-#     for sheet_name in all_sheets:
-#         expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
-#         with st.expander(f"{sheet_name}", expanded=expanded):
-#             editor_key = f"edit_{sheet_name}_{file_hash}"
-#             # Pass the initial data directly; the widget will use session_state[editor_key] internally
-#             edited_df = st.data_editor(
-#                 config[sheet_name].copy().fillna(""),
-#                 key=editor_key,
-#                 use_container_width=True,
-#                 num_rows="dynamic"
-#             )
-#             # The widget automatically updates st.session_state[editor_key]
-#             # We don't need to store it elsewhere.
-
-#     if st.button("Save All Changes", use_container_width=True):
-#         try:
-#             with pd.ExcelWriter(st.session_state['rules_file_path'], engine='openpyxl', mode='w') as writer:
-#                 for sheet_name in all_sheets:
-#                     editor_key = f"edit_{sheet_name}_{file_hash}"
-#                     df = st.session_state.get(editor_key)
-#                     if df is not None:
-#                         df.to_excel(writer, sheet_name=sheet_name, index=False)
-#                     else:
-#                         config[sheet_name].to_excel(writer, sheet_name=sheet_name, index=False)
-#             st.success("✅ Changes saved successfully!")
-#             # Reload config and update session state
-#             st.session_state['config'] = load_config(st.session_state['rules_file_path'])
-#             config = st.session_state['config']
-#             st.rerun()
-#         except Exception as e:
-#             st.error(f"❌ Save failed: {e}")
-
-#     st.markdown('</div>', unsafe_allow_html=True)
-
-
 # -------- TAB 2: EDIT --------
 with tab2:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
@@ -449,17 +405,15 @@ with tab2:
         expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
         with st.expander(f"{sheet_name}", expanded=expanded):
             editor_key = f"edit_{sheet_name}_{file_hash}"
-            # Initialize session state for this editor if not already present
-            if editor_key not in st.session_state:
-                st.session_state[editor_key] = config[sheet_name].copy().fillna("")
-            # Use the session state value as the data source
+            # Pass the initial data directly; the widget will use session_state[editor_key] internally
             edited_df = st.data_editor(
-                st.session_state[editor_key],
+                config[sheet_name].copy().fillna(""),
                 key=editor_key,
                 use_container_width=True,
                 num_rows="dynamic"
             )
             # The widget automatically updates st.session_state[editor_key]
+            # We don't need to store it elsewhere.
 
     if st.button("Save All Changes", use_container_width=True):
         try:
@@ -476,6 +430,7 @@ with tab2:
             st.session_state['config'] = load_config(st.session_state['rules_file_path'])
             config = st.session_state['config']
             # Update the editor session states with the saved data
+            # We do this AFTER saving and BEFORE rerun, so the widget shows the saved data.
             for sheet_name in all_sheets:
                 editor_key = f"edit_{sheet_name}_{file_hash}"
                 if editor_key in st.session_state:
@@ -485,7 +440,6 @@ with tab2:
             st.error(f"❌ Save failed: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
-
 # -------- TAB 3: DOWNLOADS --------
 with tab3:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)

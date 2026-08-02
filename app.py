@@ -236,6 +236,14 @@ with st.sidebar:
     #         st.session_state['config_loaded'] = True
     #         st.session_state['file_hashes']['rules'] = hashlib.md5(rules_file.getvalue()).hexdigest()
     # rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
+
+    rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
+    if rules_file is not None:
+        with open(RULES_FILE, "wb") as f:
+            f.write(rules_file.getvalue())
+        st.session_state['rules_file_path'] = RULES_FILE
+        st.session_state['config_loaded'] = True
+        st.session_state['file_hashes']['rules'] = hashlib.md5(rules_file.getvalue()).hexdigest()
     if rules_file is not None:
         with open(RULES_FILE, "wb") as f:
             f.write(rules_file.getvalue())

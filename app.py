@@ -376,7 +376,7 @@ with tab1:
                     st.stop()
                 
                 rules_file_path = RULES_FILE
-                st.info(f"Using Rules file: {rules_file_path}")
+                st.info(f"Reading your local Rules file...")
 
                 settings_df = current_config.get("Settings", pd.DataFrame()).copy()
                 settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path

@@ -389,6 +389,7 @@ with tab1:
                 st.error(f"Error: {e}")
                 st.code(traceback.format_exc(), language="python")
     st.markdown('</div>', unsafe_allow_html=True)
+
 # -------- TAB 2: EDIT --------
 with tab2:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
@@ -424,17 +425,23 @@ with tab2:
 
     if st.button("Save All Changes", use_container_width=True):
         try:
-            # Save to the session state file path
-            file_path = st.session_state['rules_file_path']
-            st.info(f"📁 Saving to: {file_path}")
+            # Create a new temporary file for the edited version
+            # Use the same suffix and keep it persistent across session
+            if 'rules_file_path' in st.session_state and os.path.exists(st.session_state['rules_file_path']):
+                # We'll create a new file with a unique name
+                new_fd, new_path = tempfile.mkstemp(suffix=".xlsx", prefix="rules_")
+                os.close(new_fd)
+            else:
+                new_path = tempfile.mktemp(suffix=".xlsx", prefix="rules_")
+            
+            st.info(f"📁 Saving edited rules to: {new_path}")
 
-            # Write all sheets using openpyxl directly to avoid pandas issues
+            # Write all sheets using openpyxl
             from openpyxl import Workbook
             from openpyxl.utils.dataframe import dataframe_to_rows
 
             wb = Workbook()
-            # Remove default sheet
-            wb.remove(wb.active)
+            wb.remove(wb.active)  # Remove default sheet
 
             for sheet_name in all_sheets:
                 editor_key = f"editor_{sheet_name}"
@@ -447,11 +454,23 @@ with tab2:
                 for r in dataframe_to_rows(df, index=False, header=True):
                     ws.append(r)
 
-            wb.save(file_path)
-            st.success("Changes saved successfully!")
+            wb.save(new_path)
+            
+            # Update session state to use the new file path
+            # Delete old file if it exists and is not the same as new_path
+            old_path = st.session_state.get('rules_file_path')
+            if old_path and os.path.exists(old_path) and old_path != new_path:
+                try:
+                    os.unlink(old_path)
+                except:
+                    pass
+            
+            st.session_state['rules_file_path'] = new_path
+            st.session_state['config_loaded'] = True  # ensure it's loaded
+            st.success("✅ Changes saved successfully to a new file!")
 
             # Reload config and update session state
-            st.session_state['config'] = load_config(file_path)
+            st.session_state['config'] = load_config(new_path)
             # Delete editor keys so they re-initialise from the new config
             for sheet_name in all_sheets:
                 editor_key = f"editor_{sheet_name}"
@@ -459,11 +478,9 @@ with tab2:
                     del st.session_state[editor_key]
             st.rerun()
         except Exception as e:
-            st.error(f"Save failed: {e}")
+            st.error(f"❌ Save failed: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
-
-
 # -------- TAB 3: DOWNLOADS --------
 with tab3:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)

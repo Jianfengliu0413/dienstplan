@@ -320,13 +320,19 @@ if not st.session_state['config_loaded']:
 
     st.stop()
 
+# # Load config
+# try:
+#     config = load_config(st.session_state['rules_file_path'])
+# except Exception as e:
+#     st.error(f"Error loading Rules.xlsx: {e}")
+#     st.stop()
 # Load config
 try:
     config = load_config(st.session_state['rules_file_path'])
+    st.session_state['config'] = config
 except Exception as e:
     st.error(f"Error loading Rules.xlsx: {e}")
     st.stop()
-
 # --- Tabs ---
 tab1, tab2, tab3 = st.tabs(["Run", "Edit", "Downloads"])
 

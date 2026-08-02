@@ -389,8 +389,6 @@ with tab1:
                 st.error(f"Error: {e}")
                 st.code(traceback.format_exc(), language="python")
     st.markdown('</div>', unsafe_allow_html=True)
-
-
 # -------- TAB 2: EDIT --------
 with tab2:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
@@ -426,17 +424,31 @@ with tab2:
 
     if st.button("Save All Changes", use_container_width=True):
         try:
+            # Save to the session state file path
             file_path = st.session_state['rules_file_path']
-            with pd.ExcelWriter(file_path, engine='openpyxl', mode='w') as writer:
-                for sheet_name in all_sheets:
-                    editor_key = f"editor_{sheet_name}"
-                    df = st.session_state.get(editor_key)
-                    if df is None or not isinstance(df, pd.DataFrame):
-                        df = current_config[sheet_name].copy().fillna("")
-                    if not isinstance(df, pd.DataFrame):
-                        df = pd.DataFrame(df)
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-            st.success("✅ Changes saved successfully!")
+            st.info(f"📁 Saving to: {file_path}")
+
+            # Write all sheets using openpyxl directly to avoid pandas issues
+            from openpyxl import Workbook
+            from openpyxl.utils.dataframe import dataframe_to_rows
+
+            wb = Workbook()
+            # Remove default sheet
+            wb.remove(wb.active)
+
+            for sheet_name in all_sheets:
+                editor_key = f"editor_{sheet_name}"
+                df = st.session_state.get(editor_key)
+                if df is None or not isinstance(df, pd.DataFrame):
+                    df = current_config[sheet_name].copy().fillna("")
+                if not isinstance(df, pd.DataFrame):
+                    df = pd.DataFrame(df)
+                ws = wb.create_sheet(title=sheet_name)
+                for r in dataframe_to_rows(df, index=False, header=True):
+                    ws.append(r)
+
+            wb.save(file_path)
+            st.success("Changes saved successfully!")
 
             # Reload config and update session state
             st.session_state['config'] = load_config(file_path)
@@ -447,9 +459,10 @@ with tab2:
                     del st.session_state[editor_key]
             st.rerun()
         except Exception as e:
-            st.error(f"❌ Save failed: {e}")
+            st.error(f"Save failed: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
+
 
 # -------- TAB 3: DOWNLOADS --------
 with tab3:

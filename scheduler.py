@@ -317,8 +317,14 @@ def generate_day_off_suggestions(
         if doc.fte >= 100:
             continue  # only part‑time
 
-        # Target final hours based on FTE
-        target_final = (total_initial_hours + total_month_hours) * (doc.fte / 100) / total_fte if total_fte > 0 else 0
+        # # Target final hours based on FTE
+        # target_final = (total_initial_hours + total_month_hours) * (doc.fte / 100) / total_fte if total_fte > 0 else 0
+
+        # Instead of duty‑based target, use total weekday hours * FTE fraction
+        total_weekdays = len(weekday_indices)
+        total_available_hours = total_weekdays * 8.5
+        target_final = (doc.fte / 100) * total_available_hours
+
         current_hours = final_hours.get(doc_name, 0.0)
         excess = current_hours - target_final
 

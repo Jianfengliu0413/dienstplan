@@ -337,7 +337,7 @@ except Exception as e:
 
 # --- Tabs ---
 # tab1, tab2, tab3 = st.tabs(["Run", "Edit", "Downloads"])
-tab1  = st.tabs(["Run"])
+tab1,tab3  = st.tabs(["Run",'Downloads'])
 
 # -------- TAB 1: RUN --------
 with tab1:
@@ -510,57 +510,57 @@ with tab1:
 
 #     st.markdown('</div>', unsafe_allow_html=True)
 
-# # -------- TAB 3: DOWNLOADS --------
-# with tab3:
-#     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-#     st.markdown("### Download Files")
+# -------- TAB 3: DOWNLOADS --------
+with tab3:
+    st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+    st.markdown("### Download Files")
     
-#     col1, col2 = st.columns(2)
-#     with col1:
-#         st.markdown("#### Generated Schedule")
-#         if st.session_state.get('output_file') and os.path.exists(st.session_state['output_file']):
-#             with open(st.session_state['output_file'], "rb") as f:
-#                 st.download_button(
-#                     label="Download Schedule",
-#                     data=f,
-#                     file_name=os.path.basename(st.session_state['output_file']),
-#                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-#                     use_container_width=True
-#                 )
-#         else:
-#             st.info("No schedule generated yet. Run the scheduler first.")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("#### Generated Schedule")
+        if st.session_state.get('output_file') and os.path.exists(st.session_state['output_file']):
+            with open(st.session_state['output_file'], "rb") as f:
+                st.download_button(
+                    label="Download Schedule",
+                    data=f,
+                    file_name=os.path.basename(st.session_state['output_file']),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+        else:
+            st.info("No schedule generated yet. Run the scheduler first.")
     
-#     with col2:
-#         st.markdown("#### Rules.xlsx")
-#         if os.path.exists(RULES_FILE):
-#             with open(RULES_FILE, "rb") as f:
-#                 st.download_button(
-#                     label="Download Updated Rules",
-#                     data=f,
-#                     file_name="Rules_updated.xlsx",
-#                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-#                     use_container_width=True
-#                 )
-#         else:
-#             st.info("No Rules.xlsx available.")
+    with col2:
+        st.markdown("#### Rules.xlsx")
+        if os.path.exists(RULES_FILE):
+            with open(RULES_FILE, "rb") as f:
+                st.download_button(
+                    label="Download Updated Rules",
+                    data=f,
+                    file_name="Rules_updated.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+        else:
+            st.info("No Rules.xlsx available.")
     
-#     st.markdown("---")
-#     st.markdown("#### Template File")
-#     if st.session_state.get('template_path') and os.path.exists(st.session_state['template_path']):
-#         with open(st.session_state['template_path'], "rb") as f:
-#             st.download_button(
-#                 label="Download Template",
-#                 data=f,
-#                 file_name=os.path.basename(st.session_state['template_path']),
-#                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-#                 use_container_width=True
-#             )
-#     else:
-#         st.info("No template file uploaded.")
+    st.markdown("---")
+    st.markdown("#### Template File")
+    if st.session_state.get('template_path') and os.path.exists(st.session_state['template_path']):
+        with open(st.session_state['template_path'], "rb") as f:
+            st.download_button(
+                label="Download Template",
+                data=f,
+                file_name=os.path.basename(st.session_state['template_path']),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+    else:
+        st.info("No template file uploaded.")
     
-#     st.markdown("""
-#     <div class="footer">
-#         UKT IM2 - Internal Use Only
-#     </div>
-#     """, unsafe_allow_html=True)
-#     st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="footer">
+        UKT IM2 - Internal Use Only
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)

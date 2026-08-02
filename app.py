@@ -392,6 +392,7 @@ with tab1:
                 st.code(traceback.format_exc(), language="python")
     st.markdown('</div>', unsafe_allow_html=True)
 
+
 # -------- TAB 2: EDIT --------
 with tab2:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
@@ -405,15 +406,16 @@ with tab2:
         expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
         with st.expander(f"{sheet_name}", expanded=expanded):
             editor_key = f"edit_{sheet_name}_{file_hash}"
-            # Pass the initial data directly; the widget will use session_state[editor_key] internally
+            initial_df = config[sheet_name].copy().fillna("")
+            # Use session state as the source of truth; if not present, use initial_df
             edited_df = st.data_editor(
-                config[sheet_name].copy().fillna(""),
+                st.session_state.get(editor_key, initial_df),
                 key=editor_key,
                 use_container_width=True,
                 num_rows="dynamic"
             )
             # The widget automatically updates st.session_state[editor_key]
-            # We don't need to store it elsewhere.
+            # We don't need to assign edited_df to anything else
 
     if st.button("Save All Changes", use_container_width=True):
         try:
@@ -430,7 +432,6 @@ with tab2:
             st.session_state['config'] = load_config(st.session_state['rules_file_path'])
             config = st.session_state['config']
             # Update the editor session states with the saved data
-            # We do this AFTER saving and BEFORE rerun, so the widget shows the saved data.
             for sheet_name in all_sheets:
                 editor_key = f"edit_{sheet_name}_{file_hash}"
                 if editor_key in st.session_state:
@@ -440,6 +441,7 @@ with tab2:
             st.error(f"❌ Save failed: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
+
 # -------- TAB 3: DOWNLOADS --------
 with tab3:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)

@@ -400,26 +400,25 @@ with tab2:
 
     all_sheets = list(config.keys())
 
-    # Clear editor session state keys when a new file is uploaded
-    current_hash = hashlib.md5(st.session_state['rules_file_path'].encode()).hexdigest()
-    if 'last_file_hash' not in st.session_state:
-        st.session_state['last_file_hash'] = None
-    if st.session_state['last_file_hash'] != current_hash:
-        # Clear old editor keys
+    # Version key to reset editors when a new file is uploaded
+    version_key = hashlib.md5(st.session_state['rules_file_path'].encode()).hexdigest()
+    if 'edit_version' not in st.session_state:
+        st.session_state['edit_version'] = version_key
+    elif st.session_state['edit_version'] != version_key:
+        # File has changed, clear all editor keys
         for key in list(st.session_state.keys()):
             if key.startswith('editor_'):
                 del st.session_state[key]
-        st.session_state['last_file_hash'] = current_hash
+        st.session_state['edit_version'] = version_key
 
     for sheet_name in all_sheets:
         expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
         with st.expander(f"{sheet_name}", expanded=expanded):
             editor_key = f"editor_{sheet_name}"
-            # Initialize session state for this sheet if not present
-            if editor_key not in st.session_state:
-                st.session_state[editor_key] = config[sheet_name].copy().fillna("")
-            # Use only the key – the widget reads/writes to session_state[editor_key]
+            initial_df = config[sheet_name].copy().fillna("")
+            # Read from session state if available, otherwise use initial_df
             edited_df = st.data_editor(
+                st.session_state.get(editor_key, initial_df),
                 key=editor_key,
                 use_container_width=True,
                 num_rows="dynamic"
@@ -450,6 +449,7 @@ with tab2:
             st.error(f"❌ Save failed: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
+
 
 # -------- TAB 3: DOWNLOADS --------
 with tab3:

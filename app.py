@@ -388,8 +388,9 @@ with tab1:
                     except Exception as e:
                         st.warning(f"Could not read Stations sheet for debug: {e}")
                 wishes = st.session_state.get('wishes_path')
-                success, log_output = run_scheduler(template_path, output_file, rules_file_path, wishes)
-                
+
+                # Use the current_config dict directly to avoid file I/O issues
+                success, log_output = run_scheduler(template_path, output_file, None, wishes, config_dict=current_config)
                 if success:
                     st.success("Schedule generated successfully!")
                     st.session_state['output_file'] = output_file

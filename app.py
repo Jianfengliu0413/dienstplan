@@ -1,10 +1,6 @@
-
-
-
 """
 260801: v001
 """
-
 
 import streamlit as st
 import pandas as pd
@@ -202,41 +198,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True) 
 
+# --- Fixed Rules file path ---
+RULES_FILE = "Rules_edit.xlsx"
+
 # --- Session state ---
 if 'initialized' not in st.session_state:
     st.session_state.clear()
     st.session_state['initialized'] = True
-    st.session_state['rules_file_path'] = None
+    st.session_state['rules_file_path'] = RULES_FILE
     st.session_state['template_path'] = None
     st.session_state['wishes_path'] = None
     st.session_state['config_loaded'] = False
     st.session_state['output_file'] = None
     st.session_state['file_hashes'] = {}
-# --- Fixed Rules file path ---
-RULES_FILE = "Rules_edit.xlsx"
-if 'rules_file_path' not in st.session_state:
-    st.session_state['rules_file_path'] = RULES_FILE
+
 # --- Sidebar ---
 with st.sidebar:
-    # st.markdown("""
-    # <div class="sidebar-logo">
-    #     <h4>UKT IM2</h4>
-    # </div>
-    # """, unsafe_allow_html=True)
-    
-    # st.markdown("---")
-    
     st.markdown("### Upload Files (click or drag files)")
     
-    # rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
-    # if rules_file is not None:
-    #     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-    #         tmp.write(rules_file.getvalue())
-    #         st.session_state['rules_file_path'] = tmp.name
-    #         st.session_state['config_loaded'] = True
-    #         st.session_state['file_hashes']['rules'] = hashlib.md5(rules_file.getvalue()).hexdigest()
-    # rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
-
     rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
     if rules_file is not None:
         with open(RULES_FILE, "wb") as f:
@@ -244,11 +223,7 @@ with st.sidebar:
         st.session_state['rules_file_path'] = RULES_FILE
         st.session_state['config_loaded'] = True
         st.session_state['file_hashes']['rules'] = hashlib.md5(rules_file.getvalue()).hexdigest()
-    if rules_file is not None:
-        with open(RULES_FILE, "wb") as f:
-            f.write(rules_file.getvalue())
-        st.session_state['rules_file_path'] = RULES_FILE
-        st.session_state['config_loaded'] = True
+    
     template_file = st.file_uploader("Template (Stationsplan)", type=["xlsx"])
     if template_file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
@@ -263,8 +238,7 @@ with st.sidebar:
             st.session_state['wishes_path'] = tmp.name
             st.session_state['file_hashes']['wishes'] = hashlib.md5(wishes_file.getvalue()).hexdigest()
     
-    # st.markdown("---")
-    
+    st.markdown("---")
     st.markdown("### Status")
     
     rules_status = "Loaded" if st.session_state['config_loaded'] else "Not loaded"
@@ -279,10 +253,15 @@ with st.sidebar:
     wishes_class = "status-loaded" if st.session_state['wishes_path'] else "status-missing"
     st.markdown(f"**Wishes** <span class='status-badge {wishes_class}'>{wishes_status}</span>", unsafe_allow_html=True)
     
-    # st.markdown("---")
+    st.markdown("---")
     
     if st.button("Reset All", use_container_width=True):
-        for path_key in ['rules_file_path', 'template_path', 'wishes_path']:
+        if os.path.exists(RULES_FILE):
+            try:
+                os.unlink(RULES_FILE)
+            except:
+                pass
+        for path_key in ['template_path', 'wishes_path']:
             if st.session_state.get(path_key) and os.path.exists(st.session_state[path_key]):
                 try:
                     os.unlink(st.session_state[path_key])
@@ -294,7 +273,19 @@ with st.sidebar:
 
 # --- Main content ---
 if not st.session_state['config_loaded']:
-    # st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+    # If Rules_edit.xlsx exists but session says not loaded, load it
+    if os.path.exists(RULES_FILE):
+        try:
+            config = load_config(RULES_FILE)
+            st.session_state['config'] = config
+            st.session_state['config_loaded'] = True
+            st.session_state['rules_file_path'] = RULES_FILE
+            st.rerun()
+        except:
+            pass
+
+if not st.session_state['config_loaded']:
+    # Welcome page
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">
         <h3 style="color: #1a1a2e; font-weight: 700; font-size: 1.8rem; margin: 0.2rem 0;">UKT IM2 Dienstplan</h3>
@@ -333,19 +324,21 @@ if not st.session_state['config_loaded']:
     This application uses the <a href="https://developers.google.com/optimization?hl=de" target="_blank" rel="noopener noreferrer">Google OR-Tools</a> open‑source optimisation library.
     </div>
     """, unsafe_allow_html=True)
-
     st.stop()
 
+# --- Load config from the fixed file ---
 try:
-    config = load_config(st.session_state['rules_file_path'])
+    config = load_config(RULES_FILE)
     st.session_state['config'] = config
+    st.session_state['rules_file_path'] = RULES_FILE
 except Exception as e:
     st.error(f"Error loading Rules.xlsx: {e}")
     st.stop()
+
 # --- Tabs ---
 tab1, tab2, tab3 = st.tabs(["Run", "Edit", "Downloads"])
 
- # -------- TAB 1: RUN --------
+# -------- TAB 1: RUN --------
 with tab1:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
     st.markdown("### Generate Schedule")
@@ -373,23 +366,18 @@ with tab1:
                     st.error("Please upload a valid Template file (Stationsplan) in the sidebar.")
                     st.stop()
                 
-                # Use the exact same Rules file that was edited
-                rules_file_path = st.session_state['rules_file_path']
+                rules_file_path = RULES_FILE
                 st.info(f"Using Rules file: {rules_file_path}")
 
-                # Update Settings sheet in the rules file with current template and output paths
                 settings_df = current_config.get("Settings", pd.DataFrame()).copy()
                 settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
                 settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
                 if st.session_state.get('wishes_path'):
                     settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = st.session_state['wishes_path']
                 
-                # Write the updated Settings sheet back to the same file
-                # Use mode='a' with if_sheet_exists='replace' to overwrite only the Settings sheet
                 with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
                     settings_df.to_excel(writer, sheet_name="Settings", index=False)
                 
-                # Now run the scheduler with the same file
                 wishes = st.session_state.get('wishes_path')
                 success, log_output = run_scheduler(template_path, output_file, rules_file_path, wishes)
                 
@@ -416,7 +404,7 @@ with tab2:
         st.error("No sheets found in the configuration file. Please upload a valid Rules.xlsx.")
         st.stop()
 
-    version_key = hashlib.md5(st.session_state['rules_file_path'].encode()).hexdigest()
+    version_key = hashlib.md5(RULES_FILE.encode()).hexdigest()
     if 'edit_version' not in st.session_state:
         st.session_state['edit_version'] = version_key
     elif st.session_state['edit_version'] != version_key:
@@ -430,26 +418,34 @@ with tab2:
         with st.expander(f"{sheet_name}", expanded=expanded):
             editor_key = f"editor_{sheet_name}"
             initial_df = current_config[sheet_name].copy().fillna("")
+            # Ensure we have a DataFrame (convert if needed)
+            existing = st.session_state.get(editor_key)
+            if existing is not None and not isinstance(existing, pd.DataFrame):
+                # If it's a dict or something else, convert to DataFrame
+                try:
+                    existing = pd.DataFrame(existing)
+                except:
+                    existing = initial_df
+            else:
+                existing = initial_df
             edited_df = st.data_editor(
-                st.session_state.get(editor_key, initial_df),
+                existing,
                 key=editor_key,
                 use_container_width=True,
                 num_rows="dynamic"
             )
-            # widget updates st.session_state[editor_key]
+            # The widget updates st.session_state[editor_key] automatically
 
     if st.button("Save All Changes", use_container_width=True):
         try:
-            # Use the same file path – overwrite the existing file
-            file_path = st.session_state['rules_file_path']
+            file_path = RULES_FILE
             st.info(f"Saving to: {file_path}")
 
-            # Write all sheets using openpyxl directly (reliable)
             from openpyxl import Workbook
             from openpyxl.utils.dataframe import dataframe_to_rows
 
             wb = Workbook()
-            wb.remove(wb.active)  # Remove default sheet
+            wb.remove(wb.active)
 
             for sheet_name in all_sheets:
                 editor_key = f"editor_{sheet_name}"
@@ -465,9 +461,7 @@ with tab2:
             wb.save(file_path)
             st.success("Changes saved successfully!")
 
-            # Reload config and update session state
             st.session_state['config'] = load_config(file_path)
-            # Delete editor keys so they re-initialise from the new config
             for sheet_name in all_sheets:
                 editor_key = f"editor_{sheet_name}"
                 if editor_key in st.session_state:
@@ -477,7 +471,6 @@ with tab2:
             st.error(f"Save failed: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
-
 
 # -------- TAB 3: DOWNLOADS --------
 with tab3:
@@ -501,8 +494,8 @@ with tab3:
     
     with col2:
         st.markdown("#### Rules.xlsx")
-        if st.session_state.get('rules_file_path') and os.path.exists(st.session_state['rules_file_path']):
-            with open(st.session_state['rules_file_path'], "rb") as f:
+        if os.path.exists(RULES_FILE):
+            with open(RULES_FILE, "rb") as f:
                 st.download_button(
                     label="Download Updated Rules",
                     data=f,
@@ -533,4 +526,3 @@ with tab3:
     </div>
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-

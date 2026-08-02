@@ -386,20 +386,20 @@ with tab1:
                 
                 with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
                     settings_df.to_excel(writer, sheet_name="Settings", index=False)
-                # After writing Settings sheet, but before run_scheduler:
-                if os.path.exists(rules_file_path):
-                    # Print the content of the Stations sheet for verification
-                    try:
-                        debug_config = load_config(rules_file_path)
-                        stations_df = debug_config.get('Stations', pd.DataFrame())
-                        st.write("Stations sheet in the file being used:")
-                        st.dataframe(stations_df)
-                    except Exception as e:
-                        st.warning(f"Could not read Stations sheet for debug: {e}")
+                # # After writing Settings sheet, but before run_scheduler:
+                # if os.path.exists(rules_file_path):
+                #     # Print the content of the Stations sheet for verification
+                #     try:
+                #         debug_config = load_config(rules_file_path)
+                #         stations_df = debug_config.get('Stations', pd.DataFrame())
+                #         # st.write("Stations sheet in the file being used:")
+                #         # st.dataframe(stations_df)
+                #     except Exception as e:
+                #         st.warning(f"Could not read Stations sheet for debug: {e}")
 
 
-                st.subheader("Debug: Stations sheet in current_config")
-                st.dataframe(current_config.get('Stations', pd.DataFrame()))
+                # st.subheader("Debug: Stations sheet in current_config")
+                # st.dataframe(current_config.get('Stations', pd.DataFrame()))
                 wishes = st.session_state.get('wishes_path')
 
                 # Use the current_config dict directly to avoid file I/O issues

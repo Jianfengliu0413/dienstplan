@@ -359,7 +359,7 @@ with tab1:
                 
                 # Use the exact same Rules file that was edited
                 rules_file_path = st.session_state['rules_file_path']
-                st.info(f"📂 Using Rules file: {rules_file_path}")
+                st.info(f"Using Rules file: {rules_file_path}")
 
                 # Update Settings sheet in the rules file with current template and output paths
                 settings_df = current_config.get("Settings", pd.DataFrame()).copy()
@@ -447,7 +447,7 @@ with tab2:
                     ws.append(r)
 
             wb.save(file_path)
-            st.success("✅ Changes saved successfully!")
+            st.success("Changes saved successfully!")
 
             # Reload config and update session state
             st.session_state['config'] = load_config(file_path)
@@ -458,7 +458,7 @@ with tab2:
                     del st.session_state[editor_key]
             st.rerun()
         except Exception as e:
-            st.error(f"❌ Save failed: {e}")
+            st.error(f"Save failed: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
 

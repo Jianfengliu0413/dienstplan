@@ -391,58 +391,63 @@ with tab1:
                 st.error(f"Error: {e}")
                 st.code(traceback.format_exc(), language="python")
     st.markdown('</div>', unsafe_allow_html=True)
+
 # -------- TAB 2: EDIT --------
 with tab2:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
     st.markdown("### Parameters Editor")
     st.caption("Edit your configuration tables. Changes are saved to the Rules.xlsx file.")
 
+    # Get all sheet names from the loaded config
     all_sheets = list(config.keys())
+
+    # If you want to exclude some sheets (e.g., auto‑generated ones), filter them:
+    # exclude = ["WorkingHours", "Skills-Auto"]
+    # all_sheets = [s for s in all_sheets if s not in exclude]
+
     file_hash = hashlib.md5(st.session_state['rules_file_path'].encode()).hexdigest()
 
     for sheet_name in all_sheets:
+        # Expand important sheets by default
         expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
         with st.expander(f"{sheet_name}", expanded=expanded):
             editor_key = f"edit_{sheet_name}_{file_hash}"
-            # Initialize session state for this sheet if not already present
-            if editor_key not in st.session_state:
-                st.session_state[editor_key] = config[sheet_name].copy().fillna("")
-            # Display the editor using the session state value
+            # Use the current config data as initial value
+            initial_df = config[sheet_name].copy().fillna("")
             edited_df = st.data_editor(
-                st.session_state[editor_key],
+                initial_df,
                 key=editor_key,
                 use_container_width=True,
                 num_rows="dynamic"
             )
-            # Update session state with the edited version
-            st.session_state[editor_key] = edited_df
+            # The edited DataFrame is now stored in session_state[editor_key]
+            # We don't need to store it separately – it's already there.
+            # But we can keep a reference if needed.
+            st.session_state[f'edited_{sheet_name}'] = edited_df
 
     if st.button("Save All Changes", use_container_width=True):
         try:
             with pd.ExcelWriter(st.session_state['rules_file_path'], engine='openpyxl', mode='w') as writer:
                 for sheet_name in all_sheets:
                     editor_key = f"edit_{sheet_name}_{file_hash}"
+                    # Get the edited DataFrame from session state
                     df = st.session_state.get(editor_key)
                     if df is not None:
                         df.to_excel(writer, sheet_name=sheet_name, index=False)
                     else:
+                        # Fallback to original
                         config[sheet_name].to_excel(writer, sheet_name=sheet_name, index=False)
             st.success("Changes saved successfully!")
-            # Reload config and update session state for next run
+            # Reload config and update session state
             st.session_state['config'] = load_config(st.session_state['rules_file_path'])
-            # Reset the editor keys so they reload from the new config
-            # Or we can keep them and let the user continue editing; but we want to show the saved data.
-            # We'll update the session state values with the new config data.
-            new_config = st.session_state['config']
-            for sheet_name in all_sheets:
-                editor_key = f"edit_{sheet_name}_{file_hash}"
-                # Update session state with the saved data so it matches the file
-                st.session_state[editor_key] = new_config[sheet_name].copy().fillna("")
+            # Update the local config variable for the rest of the app
+            config = st.session_state['config']
+            # Refresh the page to show updated data
             st.rerun()
         except Exception as e:
             st.error(f"Save failed: {e}")
-    st.markdown('</div>', unsafe_allow_html=True)
 
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # -------- TAB 3: DOWNLOADS --------
 with tab3:

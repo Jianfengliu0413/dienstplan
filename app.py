@@ -429,40 +429,58 @@ with tab2:
         except Exception as e:
             st.error(f"Save failed: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
-# # -------- TAB 2: EDIT --------
-# with tab2:
-#     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-#     st.markdown("### Parameters Editor")
-#     st.caption("Edit your configuration tables. Changes are saved to the Rules.xlsx file.")
-    
-#     sheets_to_edit = ["Settings", "Doctors", "Stations", "DutyTypes", "Penalties", "Constraints", "GeneralRules", "StationCodeMap"]
-#     file_hash = hashlib.md5(st.session_state['rules_file_path'].encode()).hexdigest()
-    
-#     for sheet_name in sheets_to_edit:
-#         if sheet_name in config:
-#             with st.expander(f"{sheet_name}", expanded=(sheet_name=="Doctors" or sheet_name=="Settings")):
-#                 df = config[sheet_name].copy().fillna("")
-#                 editor_key = f"edit_{sheet_name}_{file_hash}"
-#                 edited_df = st.data_editor(df, key=editor_key, use_container_width=True, num_rows="dynamic")
-#                 st.session_state[f'edited_{sheet_name}'] = edited_df
-#         else:
-#             st.info(f"Sheet '{sheet_name}' not found - it will be created when you save.")
-    
-#     if st.button("Save All Changes", use_container_width=True):
-#         try:
-#             with pd.ExcelWriter(st.session_state['rules_file_path'], engine='openpyxl', mode='w') as writer:
-#                 for sheet_name in sheets_to_edit:
-#                     if sheet_name in config:
-#                         df = st.session_state.get(f'edited_{sheet_name}')
-#                         if df is not None:
-#                             df.to_excel(writer, sheet_name=sheet_name, index=False)
-#                         else:
-#                             config[sheet_name].to_excel(writer, sheet_name=sheet_name, index=False)
-#             st.success("Changes saved successfully")
-#             st.rerun()
-#         except Exception as e:
-#             st.error(f"Save failed: {e}")
-#     st.markdown('</div>', unsafe_allow_html=True)
+
+# -------- TAB 2: EDIT --------
+with tab2:
+    st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+    st.markdown("### Parameters Editor")
+    st.caption("Edit your configuration tables. Changes are saved to the Rules.xlsx file.")
+
+    all_sheets = list(config.keys())
+    file_hash = hashlib.md5(st.session_state['rules_file_path'].encode()).hexdigest()
+
+    for sheet_name in all_sheets:
+        expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
+        with st.expander(f"{sheet_name}", expanded=expanded):
+            editor_key = f"edit_{sheet_name}_{file_hash}"
+            # Initialize session state for this sheet if not already present
+            if editor_key not in st.session_state:
+                st.session_state[editor_key] = config[sheet_name].copy().fillna("")
+            # Display the editor using the session state value
+            edited_df = st.data_editor(
+                st.session_state[editor_key],
+                key=editor_key,
+                use_container_width=True,
+                num_rows="dynamic"
+            )
+            # Update session state with the edited version
+            st.session_state[editor_key] = edited_df
+
+    if st.button("Save All Changes", use_container_width=True):
+        try:
+            with pd.ExcelWriter(st.session_state['rules_file_path'], engine='openpyxl', mode='w') as writer:
+                for sheet_name in all_sheets:
+                    editor_key = f"edit_{sheet_name}_{file_hash}"
+                    df = st.session_state.get(editor_key)
+                    if df is not None:
+                        df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    else:
+                        config[sheet_name].to_excel(writer, sheet_name=sheet_name, index=False)
+            st.success("Changes saved successfully!")
+            # Reload config and update session state for next run
+            st.session_state['config'] = load_config(st.session_state['rules_file_path'])
+            # Reset the editor keys so they reload from the new config
+            # Or we can keep them and let the user continue editing; but we want to show the saved data.
+            # We'll update the session state values with the new config data.
+            new_config = st.session_state['config']
+            for sheet_name in all_sheets:
+                editor_key = f"edit_{sheet_name}_{file_hash}"
+                # Update session state with the saved data so it matches the file
+                st.session_state[editor_key] = new_config[sheet_name].copy().fillna("")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Save failed: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # -------- TAB 3: DOWNLOADS --------
 with tab3:

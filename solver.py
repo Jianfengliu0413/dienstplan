@@ -62,7 +62,7 @@ def solve_schedule(
     except ValueError as e:
         if repair_mode:
             print(f"Hard constraint error: {e}. Attempting repair by relaxing constraints...")
-            return repair_schedule(schedule, config, duties, doctors, demand)
+            return repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initial_hours)# repair_schedule(schedule, config, duties, doctors, demand)
         else:
             raise
     
@@ -76,7 +76,7 @@ def solve_schedule(
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         if repair_mode:
             print("No feasible solution found. Running repair...")
-            return repair_schedule(schedule, config, duties, doctors, demand)
+            return repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initial_hours) #repair_schedule(schedule, config, duties, doctors, demand)
         else:
             raise RuntimeError("No feasible solution.")
 

@@ -432,20 +432,19 @@ with tab2:
 
     if st.button("Save All Changes", use_container_width=True):
         try:
-            # Use mode='a' with if_sheet_exists='replace' to overwrite existing sheets
-            # This creates the file if it doesn't exist
-            with pd.ExcelWriter(
-                st.session_state['rules_file_path'],
-                engine='openpyxl',
-                mode='a' if os.path.exists(st.session_state['rules_file_path']) else 'w',
-                if_sheet_exists='replace'
-            ) as writer:
+            file_path = st.session_state['rules_file_path']
+            # Use mode='w' to overwrite the entire file
+            with pd.ExcelWriter(file_path, engine='openpyxl', mode='w') as writer:
                 for sheet_name in all_sheets:
                     editor_key = f"editor_{sheet_name}"
-                    # Get the edited DataFrame or fallback to original
+                    # Get the edited DataFrame or fallback
                     df = st.session_state.get(editor_key)
-                    if df is None:
+                    if df is None or not isinstance(df, pd.DataFrame):
+                        # Fallback to original config
                         df = config[sheet_name].copy().fillna("")
+                    # Ensure it's a DataFrame
+                    if not isinstance(df, pd.DataFrame):
+                        df = pd.DataFrame(df)
                     # Write the sheet
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
             st.success("✅ Changes saved successfully!")

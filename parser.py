@@ -463,7 +463,7 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                         if color.type == 'theme':
                             theme_idx = color.theme
                             tint = color.tint if color.tint is not None else 0.0
-                            print(f"Cell ({row}, {col}) theme: {theme_idx}, tint: {tint}")
+                            # print(f"Cell ({row}, {col}) theme: {theme_idx}, tint: {tint}") # debug
                             # Heuristic: theme 6 is often green (Accent 6)
                             if theme_idx == 6:
                                 if tint < -0.1:  # dark green

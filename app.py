@@ -41,6 +41,21 @@ st.markdown("""
         margin-bottom: 1.5rem;
         border: 1px solid #e9ecef;
     }
+    /* Reduce header height */
+    header {
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.2rem !important;
+        min-height: 1rem !important;
+    }
+    /* If there's a specific header class */
+    .stApp header {
+        padding: 0.2rem 1rem !important;
+        height: auto !important;
+    }
+    /* Also reduce the top margin of the main content to compensate */
+    .main > div {
+        padding-top: 0.5rem !important;
+    }
     /* Sidebar */
     .css-1d391kg, .stSidebar, [data-testid="stSidebar"] {
         background-color: #ffffff !important;

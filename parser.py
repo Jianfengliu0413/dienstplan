@@ -504,7 +504,11 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
     # --- 12. Apply wishes file ---
     if wishes_path and os.path.exists(wishes_path):
         apply_wishes_from_file(model, wishes_path, config, fixed_vals, vacation_color)
-
+    # --- 13. Auto-assign default skill to active doctors with no skills ---
+    for doc in model.doctors.values():
+        if not doc.skills:
+            doc.skills.add('ZD')
+            print(f"[INFO] Auto-assigned ZD to {doc.name} (no skills defined)")
     print(f"[DONE!!!]: Parsing complete: found {len(model.doctors)} doctors and {len(model.stations)} stations.")
     return model
  

@@ -394,6 +394,7 @@ with tab1:
                 st.error(f"Error: {e}")
                 st.code(traceback.format_exc(), language="python")
     st.markdown('</div>', unsafe_allow_html=True)
+
 # -------- TAB 2: EDIT --------
 with tab2:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
@@ -431,17 +432,23 @@ with tab2:
 
     if st.button("Save All Changes", use_container_width=True):
         try:
-            with pd.ExcelWriter(st.session_state['rules_file_path'], engine='openpyxl', mode='w') as writer:
+            # Use mode='a' with if_sheet_exists='replace' to overwrite existing sheets
+            # This creates the file if it doesn't exist
+            with pd.ExcelWriter(
+                st.session_state['rules_file_path'],
+                engine='openpyxl',
+                mode='a' if os.path.exists(st.session_state['rules_file_path']) else 'w',
+                if_sheet_exists='replace'
+            ) as writer:
                 for sheet_name in all_sheets:
                     editor_key = f"editor_{sheet_name}"
-                    # If the editor key exists, use it; otherwise fall back to config
-                    if editor_key in st.session_state:
-                        df = st.session_state[editor_key]
-                    else:
+                    # Get the edited DataFrame or fallback to original
+                    df = st.session_state.get(editor_key)
+                    if df is None:
                         df = config[sheet_name].copy().fillna("")
                     # Write the sheet
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
-            st.success("Changes saved successfully!")
+            st.success("✅ Changes saved successfully!")
             # Reload config and update session state
             st.session_state['config'] = load_config(st.session_state['rules_file_path'])
             config = st.session_state['config']
@@ -452,11 +459,9 @@ with tab2:
                     st.session_state[editor_key] = config[sheet_name].copy().fillna("")
             st.rerun()
         except Exception as e:
-            st.error(f"Save failed: {e}")
+            st.error(f"❌ Save failed: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
-
-
 
 # -------- TAB 3: DOWNLOADS --------
 with tab3:

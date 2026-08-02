@@ -212,7 +212,10 @@ if 'initialized' not in st.session_state:
     st.session_state['config_loaded'] = False
     st.session_state['output_file'] = None
     st.session_state['file_hashes'] = {}
-
+# --- Fixed Rules file path ---
+RULES_FILE = "Rules_edit.xlsx"
+if 'rules_file_path' not in st.session_state:
+    st.session_state['rules_file_path'] = RULES_FILE
 # --- Sidebar ---
 with st.sidebar:
     # st.markdown("""
@@ -225,14 +228,19 @@ with st.sidebar:
     
     st.markdown("### Upload Files (click or drag files)")
     
-    rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
+    # rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
+    # if rules_file is not None:
+    #     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+    #         tmp.write(rules_file.getvalue())
+    #         st.session_state['rules_file_path'] = tmp.name
+    #         st.session_state['config_loaded'] = True
+    #         st.session_state['file_hashes']['rules'] = hashlib.md5(rules_file.getvalue()).hexdigest()
+    # rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
     if rules_file is not None:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-            tmp.write(rules_file.getvalue())
-            st.session_state['rules_file_path'] = tmp.name
-            st.session_state['config_loaded'] = True
-            st.session_state['file_hashes']['rules'] = hashlib.md5(rules_file.getvalue()).hexdigest()
-    
+        with open(RULES_FILE, "wb") as f:
+            f.write(rules_file.getvalue())
+        st.session_state['rules_file_path'] = RULES_FILE
+        st.session_state['config_loaded'] = True
     template_file = st.file_uploader("Template (Stationsplan)", type=["xlsx"])
     if template_file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
@@ -426,7 +434,7 @@ with tab2:
         try:
             # Use the same file path – overwrite the existing file
             file_path = st.session_state['rules_file_path']
-            st.info(f"📁 Saving to: {file_path}")
+            st.info(f"Saving to: {file_path}")
 
             # Write all sheets using openpyxl directly (reliable)
             from openpyxl import Workbook

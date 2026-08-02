@@ -16,6 +16,7 @@ from models import ScheduleModel, DutyType
 from demand_builder import build_demand
 from visualize import visualize_schedule 
 import sys
+import tempfile
 from io import StringIO
 from typing import List, Tuple, Dict
 

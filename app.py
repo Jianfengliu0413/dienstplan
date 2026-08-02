@@ -43,18 +43,18 @@ st.markdown("""
     }
     /* Reduce header height */
     header {
-        padding-top: 0.2rem !important;
-        padding-bottom: 0.2rem !important;
-        min-height: 1rem !important;
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+        min-height: 0rem !important;
     }
     /* If there's a specific header class */
     .stApp header {
-        padding: 0.2rem 1rem !important;
+        padding: 0.2rem 0rem !important;
         height: auto !important;
     }
     /* Also reduce the top margin of the main content to compensate */
     .main > div {
-        padding-top: 0.5rem !important;
+        padding-top: 0.1rem !important;
     }
     /* Sidebar */
     .css-1d391kg, .stSidebar, [data-testid="stSidebar"] {

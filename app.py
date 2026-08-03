@@ -323,13 +323,8 @@ if not st.session_state['config_loaded']:
     st.info("""
     **Confidential - Internal Use Only**  
     This system is for authorised personnel only. All data processed through this application is sensitive and must be handled in compliance with applicable data protection regulations.
-    """)
-    
-    st.info("""
-    - All file uploads are not stored on any external server.
+    - All file uploads are not stored on any external server (is not connected to any external databases or cloud storage.).
     - Temporary files are automatically deleted after your session ends.
-    - This application is not connected to any external databases or cloud storage.
-    
     - For any technical issues, please contact JF (TEL: xxxxx61369).""")
     
     st.markdown("""

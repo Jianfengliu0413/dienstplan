@@ -20,12 +20,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-# add a timer
+# --- add a timer --- 
 if 'last_activity' in st.session_state:
     elapsed= datetime.now()-st.session_state['last_activity'].seconds
     if elapsed > 10: # in seonds
         st.session_state.clear()
-        st.return()
+        st.rerun()
 st.session_state['last_activity']= datetime.now()
 # --- Custom CSS ---
 st.markdown("""

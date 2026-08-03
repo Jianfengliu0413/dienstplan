@@ -24,10 +24,12 @@ st.set_page_config(
 
 # --- Fixed Rules file path ---
 RULES_FILE = "Rules_edit.xlsx"
+INACTIVITY_TIMEOUT_SECONDS = 10 # in seconds
+
 # --- add a timer --- 
 if 'last_activity' in st.session_state:
-    elapsed= (datetime.now()-st.session_state['last_activity']).seconds
-    if elapsed > 10: # in seonds
+    elapsed= (datetime.now()-st.session_state['last_activity']).total_seconds()
+    if elapsed > INACTIVITY_TIMEOUT_SECONDS: # in seonds
         if os.path.exists(RULES_FILE):
             try:
                 os.unlink(RULES_FILE)

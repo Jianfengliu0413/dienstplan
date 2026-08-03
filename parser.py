@@ -543,9 +543,11 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                     print(f"[HOLIDAY] {doc_name} unavailable on {model.days[day_idx].date}")
                 else:
                     print(f"[HOLIDAY WARNING] Doctor '{doc_name}' not found in model.")
+
     # --- 13. Apply wishes file ---
     if wishes_path and os.path.exists(wishes_path):
         apply_wishes_from_file(model, wishes_path, config, fixed_vals, vacation_color)
+
     # --- 13. Auto-assign default skill to active doctors with no skills ---
     for doc in model.doctors.values():
         if not doc.skills:

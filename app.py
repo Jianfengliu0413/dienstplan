@@ -294,16 +294,20 @@ if not st.session_state['config_loaded']:
     """, unsafe_allow_html=True)
     
     st.error("""
+    ### Data Privacy and Security
+    Once you upload a valid Rules file (in sidbar), this page will be replaced with the full featured interface.
+
+    """)
+    st.info("""
     **Confidential - Internal Use Only**  
     This system is for authorised personnel only. All data processed through this application is sensitive and must be handled in compliance with applicable data protection regulations.
     """)
     
-    st.info("Once you upload a valid Rules.xlsx file, this page will be replaced with the full featured interface.")
     st.info("""
-    ### Data Privacy and Security
-    - All file uploads are processed locally in your browser and not stored on any external server.
+    - All file uploads are not stored on any external server.
     - Temporary files are automatically deleted after your session ends.
     - This application is not connected to any external databases or cloud storage.
+    
     - For any technical issues, please contact JF (TEL: xxxxx61369).""")
     
     st.markdown("""

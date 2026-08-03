@@ -21,7 +21,7 @@ st.set_page_config(
 )
 # add a timer
 if 'last_activity' in st.session_state:
-    elapsed= (datetime.now()-st.session_state['last_activity'].seconds
+    elapsed= datetime.now()-st.session_state['last_activity'].seconds
     if elapsed > 10: # in seonds
         st.session_state.clear()
         st.return()

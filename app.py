@@ -329,7 +329,6 @@ if not st.session_state['config_loaded']:
     
     st.markdown("""
     ### Getting Started
-    This tool uses the Google OR-Tools open‑source library. https://developers.google.com/optimization?hl=de
     To begin, please follow these steps:
     1.  Upload your configuration –- Rules.xlsx file in the sidebar. This file contains all rules, doctors, stations, duties ...
     2.  Upload the monthly template –- The Stationsplan Excel file for the target month (e.g., xxxstationsplanxxx.xlsx).

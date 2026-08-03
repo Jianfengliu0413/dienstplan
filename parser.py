@@ -500,16 +500,15 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                     model.editable_cells.add((row, col))
                 else:
                     model.fixed_cells.add((row, col))
-    # --- 12 Read HolidayRules sheet ---
+
+    # --- 12. Read HolidayRules sheet ---
     holiday_cfg = config.get('HolidayRules', pd.DataFrame())
     if not holiday_cfg.empty:
         for _, row in holiday_cfg.iterrows():
             doc_name = str(row['Doctor']).strip()
             day_val = row.get('Day')
-            # day_val can be a date, datetime, or integer day number
             if pd.isna(day_val):
                 continue
-            # Try to convert to day index
             day_idx = None
             if isinstance(day_val, (int, float)):
                 day_num = int(day_val)
@@ -518,7 +517,6 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                         day_idx = idx
                         break
             elif isinstance(day_val, (datetime, pd.Timestamp)):
-                # Convert to datetime if needed
                 if isinstance(day_val, pd.Timestamp):
                     day_date = day_val.to_pydatetime()
                 else:
@@ -528,7 +526,6 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                         day_idx = idx
                         break
             else:
-                # Try to parse as string
                 try:
                     day_date = pd.to_datetime(day_val)
                     for idx, d in enumerate(model.days):
@@ -548,13 +545,15 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
     if wishes_path and os.path.exists(wishes_path):
         apply_wishes_from_file(model, wishes_path, config, fixed_vals, vacation_color)
 
-    # --- 13. Auto-assign default skill to active doctors with no skills ---
+    # --- 14. Auto-assign default skill to active doctors with no skills ---
     for doc in model.doctors.values():
         if not doc.skills:
             doc.skills.add('ZD')
             print(f"[INFO] Auto-assigned ZD to {doc.name} (no skills defined)")
+
     print(f"[DONE!!!]: Parsing complete: found {len(model.doctors)} doctors and {len(model.stations)} stations.")
     return model
+
  
 def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict, fixed_vals: set, vacation_color: str):
     """

@@ -518,7 +518,7 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                         day_idx = idx
                         break
             elif isinstance(day_val, (datetime, pd.Timestamp)):
-                # Convert to datetime if needed
+                # Convert to datetime if needed
                 if isinstance(day_val, pd.Timestamp):
                     day_date = day_val.to_pydatetime()
                 else:
@@ -528,7 +528,7 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                         day_idx = idx
                         break
             else:
-                # Try to parse as string
+                # Try to parse as string
                 try:
                     day_date = pd.to_datetime(day_val)
                     for idx, d in enumerate(model.days):

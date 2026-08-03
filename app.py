@@ -317,9 +317,8 @@ if not st.session_state['config_loaded']:
     1.  Upload your configuration –- Rules.xlsx file in the sidebar. This file contains all rules, doctors, stations, duties ...
     2.  Upload the monthly template –- The Stationsplan Excel file for the target month (e.g., xxxstationsplanxxx.xlsx).
     3.  Upload doctor's wishes – (optional).
-    4.  Review and adjust parameters – Use the Edit tab to fine-tune settings...
-    5.  Run the scheduler – Click Generate Schedule and wait for the optimised plan.
-    6.  Download the results – Obtain the generated schedule and the updated Rules.xlsx from the Downloads tab.
+    4.  Run the scheduler – Click Generate Schedule and wait for the optimised plan.
+    5.  Download the results – Obtain the generated schedule and the updated Rules.xlsx from the Downloads tab.
     """)
     
     st.markdown(""" 

@@ -523,10 +523,10 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                     day_date = day_val.to_pydatetime()
                 else:
                     day_date = day_val
-                    for idx, d in enumerate(model.days):
-                        if d.date.date() == day_date.date():
-                            day_idx = idx
-                            break
+                for idx, d in enumerate(model.days):
+                    if d.date.date() == day_date.date():
+                        day_idx = idx
+                        break
             else:
                 # Try to parse as string
                 try:

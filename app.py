@@ -20,6 +20,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+
+# --- Fixed Rules file path ---
+RULES_FILE = "Rules_edit.xlsx"
 # --- add a timer --- 
 if 'last_activity' in st.session_state:
     elapsed= (datetime.now()-st.session_state['last_activity']).seconds
@@ -216,9 +220,6 @@ st.markdown("""
 
 </style>
 """, unsafe_allow_html=True) 
-
-# --- Fixed Rules file path ---
-RULES_FILE = "Rules_edit.xlsx"
 
 # --- Session state ---
 if 'initialized' not in st.session_state:

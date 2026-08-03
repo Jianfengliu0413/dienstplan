@@ -15,7 +15,7 @@ from config_loader import load_config
 # --- Page config ---
 st.set_page_config(
     page_title="UKT IM2 Duty Scheduler",
-    page_icon="",
+    page_icon="is currently under development by Jeff",
     layout="wide",
     initial_sidebar_state="expanded"
 )

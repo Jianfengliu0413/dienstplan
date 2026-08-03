@@ -11,15 +11,40 @@ import hashlib
 import traceback
 from scheduler import run_scheduler
 from config_loader import load_config
+from datetime import datetime
 
 # --- Page config ---
 st.set_page_config(
-    page_title="UKT IM2 Duty Scheduler",
+    page_title=f"UKT IM2 Duty Scheduler \nBeta Version...",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+
+# --- Fixed Rules file path ---
+RULES_FILE = "Rules_edit.xlsx"
+INACTIVITY_TIMEOUT_SECONDS = 300 # in seconds
+
+# --- add a timer --- 
+if 'last_activity' in st.session_state:
+    elapsed= (datetime.now()-st.session_state['last_activity']).total_seconds()
+    if elapsed > INACTIVITY_TIMEOUT_SECONDS: # in seonds
+        if os.path.exists(RULES_FILE):
+            try:
+                os.unlink(RULES_FILE)
+            except:
+                pass
+        for path_key in ['template_path', 'wishes_path']:
+            if st.session_state.get(path_key) and os.path.exists(st.session_state[path_key]):
+                try:
+                    os.unlink(st.session_state[path_key])
+                except:
+                    pass
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+st.session_state['last_activity']= datetime.now()
 # --- Custom CSS ---
 st.markdown("""
 
@@ -198,9 +223,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True) 
 
-# --- Fixed Rules file path ---
-RULES_FILE = "Rules_edit.xlsx"
-
 # --- Session state ---
 if 'initialized' not in st.session_state:
     st.session_state.clear()
@@ -294,16 +316,20 @@ if not st.session_state['config_loaded']:
     """, unsafe_allow_html=True)
     
     st.error("""
+    ### Data Privacy and Security
+    Once you upload a valid Rules file (in sidbar), this page will be replaced with the full featured interface.
+
+    """)
+    st.info("""
     **Confidential - Internal Use Only**  
     This system is for authorised personnel only. All data processed through this application is sensitive and must be handled in compliance with applicable data protection regulations.
     """)
     
-    st.info("Once you upload a valid Rules.xlsx file, this page will be replaced with the full featured interface.")
     st.info("""
-    ### Data Privacy and Security
-    - All file uploads are processed locally in your browser and not stored on any external server.
+    - All file uploads are not stored on any external server.
     - Temporary files are automatically deleted after your session ends.
     - This application is not connected to any external databases or cloud storage.
+    
     - For any technical issues, please contact JF (TEL: xxxxx61369).""")
     
     st.markdown("""
@@ -313,9 +339,8 @@ if not st.session_state['config_loaded']:
     1.  Upload your configuration –- Rules.xlsx file in the sidebar. This file contains all rules, doctors, stations, duties ...
     2.  Upload the monthly template –- The Stationsplan Excel file for the target month (e.g., xxxstationsplanxxx.xlsx).
     3.  Upload doctor's wishes – (optional).
-    4.  Review and adjust parameters – Use the Edit tab to fine-tune settings...
-    5.  Run the scheduler – Click Generate Schedule and wait for the optimised plan.
-    6.  Download the results – Obtain the generated schedule and the updated Rules.xlsx from the Downloads tab.
+    4.  Run the scheduler – Click Generate Schedule and wait for the optimised plan.
+    5.  Download the results – Obtain the generated schedule and the updated Rules.xlsx from the Downloads tab.
     """)
     
     st.markdown(""" 

@@ -311,7 +311,7 @@ if not st.session_state['config_loaded']:
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">
         <h3 style="color: #1a1a2e; font-weight: 700; font-size: 1.8rem; margin: 0.2rem 0;">UKT IM2 Dienstplan</h3>
-        <hr style="width: 60px; border: 2px solid #2E86C1; margin: 0rem auto;">
+        <hr style="width: 60px; border: 2px solid #2E86C1; margin: 0rem auto;">beta version</hr>
     </div>
     """, unsafe_allow_html=True)
     

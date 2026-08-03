@@ -15,7 +15,7 @@ from datetime import datetime
 
 # --- Page config ---
 st.set_page_config(
-    page_title=f"UKT IM2 Duty Scheduler \nBeta Version...",
+    page_title=f"UKT IM2 Dienstplan",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"

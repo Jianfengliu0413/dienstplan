@@ -24,7 +24,19 @@ st.set_page_config(
 if 'last_activity' in st.session_state:
     elapsed= (datetime.now()-st.session_state['last_activity']).seconds
     if elapsed > 10: # in seonds
-        st.session_state.clear()
+        if os.path.exists(RULES_FILE):
+            try:
+                os.unlink(RULES_FILE)
+            except:
+                pass
+        for path_key in ['template_path', 'wishes_path']:
+            if st.session_state.get(path_key) and os.path.exists(st.session_state[path_key]):
+                try:
+                    os.unlink(st.session_state[path_key])
+                except:
+                    pass
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
         st.rerun()
 st.session_state['last_activity']= datetime.now()
 # --- Custom CSS ---

@@ -13,7 +13,14 @@ import uuid
 from datetime import datetime
 from scheduler import run_scheduler
 from config_loader import load_config
-from streamlit_autorefresh import st_autorefresh
+
+# --- Try to import auto-refresh, fallback gracefully ---
+try:
+    from streamlit_autorefresh import st_autorefresh
+    HAS_AUTOREFRESH = True
+except ImportError:
+    HAS_AUTOREFRESH = False
+    st_autorefresh = None
 
 # --- Page config ---
 st.set_page_config(
@@ -23,8 +30,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Auto-refresh every 30 seconds to enable inactivity timer ---
-st_autorefresh(interval=30000, key="autorefresh")
+# --- Auto-refresh every 30 seconds (if available) ---
+if HAS_AUTOREFRESH:
+    st_autorefresh(interval=30000, key="autorefresh")
+else:
+    st.sidebar.warning(
+        "⚠️ Auto-refresh not available. Install `streamlit-autorefresh` for automatic session timeout."
+    )
 
 # --- Inactivity timeout (seconds) ---
 INACTIVITY_TIMEOUT_SECONDS = 300  # 5 minutes
@@ -53,7 +65,7 @@ if 'last_activity' in st.session_state:
 # Update last activity timestamp
 st.session_state['last_activity'] = datetime.now()
 
-# --- Custom CSS ---
+# --- Custom CSS (unchanged) ---
 st.markdown("""
 <style>
     /* Main background */

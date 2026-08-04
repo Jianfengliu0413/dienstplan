@@ -23,7 +23,7 @@ st.set_page_config(
 
 # --- Fixed Rules file path ---
 RULES_FILE = "Rules_edit.xlsx"
-INACTIVITY_TIMEOUT_SECONDS = 300  # 5 minutes
+INACTIVITY_TIMEOUT_SECONDS = 10  # 5 minutes
 
 # --- Timer: clear session after inactivity ---
 # This runs first, before anything else

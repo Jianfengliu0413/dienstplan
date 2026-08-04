@@ -9,21 +9,20 @@ import tempfile
 import shutil
 import hashlib
 import traceback
-import uuid
-from datetime import datetime
 from scheduler import run_scheduler
 from config_loader import load_config
- 
+from datetime import datetime
+
 # --- Page config ---
 st.set_page_config(
     page_title="IM2 Dienstplan",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
-) 
+)
 
 # --- Inactivity timeout (seconds) ---
-INACTIVITY_TIMEOUT_SECONDS = 300  # 5 minutes
+INACTIVITY_TIMEOUT_SECONDS = 30  # in seconds
 
 # --- Timer check ---
 if 'last_activity' in st.session_state:
@@ -42,14 +41,12 @@ if 'last_activity' in st.session_state:
                     os.unlink(st.session_state[path_key])
                 except:
                     pass
-        # Clear session state
         st.session_state.clear()
         st.rerun()
 
-# Update last activity timestamp
 st.session_state['last_activity'] = datetime.now()
 
-# --- Custom CSS (unchanged) ---
+# --- Custom CSS ---
 st.markdown("""
 <style>
     /* Main background */
@@ -299,7 +296,7 @@ with st.sidebar:
 
 # --- Main content ---
 if not st.session_state.get('config_loaded', False):
-    # If a rules file exists but session says not loaded, try to load it
+    # If the rules file exists but session says not loaded, try to load it
     rules_path = st.session_state.get('rules_file_path')
     if rules_path and os.path.exists(rules_path):
         try:
@@ -315,7 +312,7 @@ if not st.session_state.get('config_loaded', False):
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">
         <h3 style="color: #1a1a2e; font-weight: 700; font-size: 1.8rem; margin: 0.2rem 0;">IM2 Dienstplan</h3>
-        <hr style="width: 200px; border: 1px solid #2E86C1; margin: 0rem auto;">hospital shift scheduling (beta version)</hr>
+        <hr style="width: 200px; border: 1px solid #2E86C1; margin: 0rem auto;">hospital shift schu(beta version)</hr>
     </div>
     """, unsafe_allow_html=True)
     
@@ -363,17 +360,15 @@ with tab1:
     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
     st.markdown("### Generate Schedule")
     
-    current_config = st.session_state.get('config', {})
+    current_config = st.session_state.get('config', config)
     
-    # --- DEBUG: Show all sheets (only if DEBUG is enabled) ---
-    DEBUG = False  # Set to True during development
-    if DEBUG:
-        with st.expander("Debug: Show all sheets in current_config", expanded=False):
-            st.write("**Sheet names and first rows:**")
-            for sheet_name in sorted(current_config.keys()):
-                st.write(f"**{sheet_name}**")
-                df = current_config[sheet_name]
-                st.dataframe(df)
+    # --- DEBUG: Show all sheets in the current config ---
+    with st.expander("Show all sheets in current_config", expanded=False):
+        st.write("**Sheet names and first rows:**")
+        for sheet_name in sorted(current_config.keys()):
+            st.write(f"**{sheet_name}**")
+            df = current_config[sheet_name]
+            st.dataframe(df)
      
     col1, col2, col3 = st.columns(3)
     with col1:

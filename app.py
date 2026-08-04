@@ -42,9 +42,7 @@ if 'last_activity' in st.session_state:
                 except:
                     pass
         for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        # Set config_loaded to False explicitly
-        st.session_state['config_loaded'] = False
+            del st.session_state[key] 
         # Rerun to go to welcome page
         st.rerun()
 
@@ -298,7 +296,7 @@ with st.sidebar:
         st.rerun()
 
 # --- Main content ---
-if not st.session_state['config_loaded']:
+if not st.session_state.get('config_loaded', False):
     # If Rules_edit.xlsx exists but session says not loaded, load it
     if os.path.exists(RULES_FILE):
         try:
@@ -309,8 +307,7 @@ if not st.session_state['config_loaded']:
             st.rerun()
         except:
             pass
-
-if not st.session_state['config_loaded']:
+if not st.session_state.get('config_loaded', False):
     # Welcome page
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">
@@ -349,15 +346,21 @@ if not st.session_state['config_loaded']:
     """, unsafe_allow_html=True)
     st.stop()
 
-# --- Load config from the fixed file ---
-try:
-    config = load_config(RULES_FILE)
-    st.session_state['config'] = config
-    st.session_state['rules_file_path'] = RULES_FILE
-except Exception as e:
-    st.error(f"Error loading Rules.xlsx: {e}")
-    st.stop()
+# # --- Load config from the fixed file ---
+# try:
+#     config = load_config(RULES_FILE)
+#     st.session_state['config'] = config
+#     st.session_state['rules_file_path'] = RULES_FILE
+# except Exception as e:
+#     st.error(f"Error loading Rules.xlsx: {e}")
+#     st.stop()
 
+
+# --- Load config from session state (NOT from a top-level variable) ---
+config = st.session_state.get('config')
+if config is None:
+    st.error("Configuration not found. Please upload a valid Rules.xlsx file.")
+    st.stop()
 # --- Tabs ---
 # tab1, tab2, tab3 = st.tabs(["Run", "Edit", "Downloads"])
 tab1,tab3  = st.tabs(["Run",'Downloads'])

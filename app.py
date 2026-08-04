@@ -594,12 +594,4 @@ with tab3:
     </div>
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-
-col1, col2 = st.columns(2)
-with col1:
-    st.pyplot(figs['heatmap'])
-    st.pyplot(figs['workload'])
-with col2:
-    st.pyplot(figs['coverage'])
-    st.pyplot(figs['violations'])
-st.pyplot(figs['progress'])
+ 

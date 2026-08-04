@@ -12,7 +12,7 @@ import traceback
 from scheduler import run_scheduler
 from config_loader import load_config
 from datetime import datetime
-from visualize import render_visualizations 
+
 # --- Page config ---
 st.set_page_config(
     page_title=f"IM2 Dienstplan",

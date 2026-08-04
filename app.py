@@ -310,18 +310,30 @@ with st.sidebar:
         st.rerun()
 
 # --- Main content ---
-if not st.session_state.get('config_loaded', False):
-    # If Rules_edit.xlsx exists but session says not loaded, load it
-    if os.path.exists(RULES_FILE):
-        try:
-            config = load_config(RULES_FILE)
-            st.session_state['config'] = config
-            st.session_state['config_loaded'] = True
-            st.session_state['rules_file_path'] = RULES_FILE
-            st.rerun()
-        except:
-            pass
-if not st.session_state.get('config_loaded', False):
+# if not st.session_state.get('config_loaded', False):
+#     # If Rules_edit.xlsx exists but session says not loaded, load it
+#     if os.path.exists(RULES_FILE):
+#         try:
+#             config = load_config(RULES_FILE)
+#             st.session_state['config'] = config
+#             st.session_state['config_loaded'] = True
+#             st.session_state['rules_file_path'] = RULES_FILE
+#             st.rerun()
+#         except:
+#             pass
+# if not st.session_state.get('config_loaded', False):
+
+config = st.session_state.get('config')
+
+if config is None and os.path.exists(RULES_FILE):
+    # Try to load from file if session state is empty
+    try:
+        config = load_config(RULES_FILE)
+        st.session_state['config'] = config
+    except:
+        pass
+
+if config is None:
     # Welcome page
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">
@@ -368,13 +380,8 @@ if not st.session_state.get('config_loaded', False):
 # except Exception as e:
 #     st.error(f"Error loading Rules.xlsx: {e}")
 #     st.stop()
-
-
-# --- Load config from session state (NOT from a top-level variable) ---
-config = st.session_state.get('config')
-if config is None:
-    st.error("Configuration not found. Please upload a valid Rules.xlsx file.")
-    st.stop()
+ 
+st.session_state['config'] = config  # ensure it's set
 # --- Tabs ---
 # tab1, tab2, tab3 = st.tabs(["Run", "Edit", "Downloads"])
 tab1,tab3  = st.tabs(["Run",'Downloads'])

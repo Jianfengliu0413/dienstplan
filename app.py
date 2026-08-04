@@ -15,7 +15,7 @@ from datetime import datetime
 
 # --- Page config ---
 st.set_page_config(
-    page_title=f"UKT IM2 Dienstplan",
+    page_title=f"IM2 Dienstplan",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -310,7 +310,7 @@ if not st.session_state['config_loaded']:
     # Welcome page
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">
-        <h3 style="color: #1a1a2e; font-weight: 700; font-size: 1.8rem; margin: 0.2rem 0;">UKT IM2 Dienstplan</h3>
+        <h3 style="color: #1a1a2e; font-weight: 700; font-size: 1.8rem; margin: 0.2rem 0;">IM2 Dienstplan</h3>
         <hr style="width: 200px; border: 1px solid #2E86C1; margin: 0rem auto;">beta version</hr>
     </div>
     """, unsafe_allow_html=True)
@@ -339,7 +339,7 @@ if not st.session_state['config_loaded']:
     
     st.markdown(""" 
     <div class="footer">
-    UKT IM2 – Internal Use Only<br>
+    IM2 – Internal Use Only<br>
     This application uses the <a href="https://developers.google.com/optimization?hl=de" target="_blank" rel="noopener noreferrer">Google OR-Tools</a> open‑source optimisation library.
     </div>
     """, unsafe_allow_html=True)
@@ -577,7 +577,7 @@ with tab3:
     
     st.markdown("""
     <div class="footer">
-        UKT IM2 - Internal Use Only
+        IM2 - Internal Use Only
     </div>
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)

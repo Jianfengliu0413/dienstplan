@@ -19,7 +19,7 @@ import sys
 import tempfile
 from io import StringIO
 from typing import List, Tuple, Dict
-
+from visualize import render_visualizations
 def create_default_config(config_path: str):
     """Generate a default Rules.xlsx with sample data."""
     with pd.ExcelWriter(config_path, engine='openpyxl') as writer:
@@ -520,6 +520,8 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
         visualize_schedule(schedule, assignment, duties, doctors, output_file.replace('.xlsx', ''))
     except Exception as e:
         print(f"Visualization failed: {e}")
+    
+    figs = render_visualizations(schedule, assignment, duties, doctors, solver=solver)
     return output_file
  
 def run_scheduler(template_path, output_path, config_path, wishes_path=None, config_dict=None):

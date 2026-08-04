@@ -12,7 +12,7 @@ import traceback
 from scheduler import run_scheduler
 from config_loader import load_config
 from datetime import datetime
-
+from visualize import render_visualizations 
 # --- Page config ---
 st.set_page_config(
     page_title=f"IM2 Dienstplan",
@@ -311,7 +311,7 @@ if not st.session_state['config_loaded']:
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">
         <h3 style="color: #1a1a2e; font-weight: 700; font-size: 1.8rem; margin: 0.2rem 0;">IM2 Dienstplan</h3>
-        <hr style="width: 200px; border: 1px solid #2E86C1; margin: 0rem auto;">beta version</hr>
+        <hr style="width: 200px; border: 1px solid #2E86C1; margin: 0rem auto;">hospital shift scheduling(beta version)</hr>
     </div>
     """, unsafe_allow_html=True)
     
@@ -581,3 +581,12 @@ with tab3:
     </div>
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    st.pyplot(figs['heatmap'])
+    st.pyplot(figs['workload'])
+with col2:
+    st.pyplot(figs['coverage'])
+    st.pyplot(figs['violations'])
+st.pyplot(figs['progress'])

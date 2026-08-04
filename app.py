@@ -34,12 +34,9 @@ st.set_page_config(
 if HAS_AUTOREFRESH:
     st_autorefresh(interval=30000, key="autorefresh")
 else:
-    st.sidebar.warning(
-        "⚠️ Auto-refresh not available. Install `streamlit-autorefresh` for automatic session timeout."
-    )
-
+    pass
 # --- Inactivity timeout (seconds) ---
-INACTIVITY_TIMEOUT_SECONDS = 300  # 5 minutes
+INACTIVITY_TIMEOUT_SECONDS = 30  # 5 minutes
 
 # --- Timer check ---
 if 'last_activity' in st.session_state:

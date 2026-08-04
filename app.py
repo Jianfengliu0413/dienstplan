@@ -429,6 +429,7 @@ with tab1:
                     st.session_state['log_output'] = log_output
 
                     # --- Display visualizations ---
+                    output_file, schedule, assignment, duties, doctors, solver = result
                     st.subheader("Schedule Quality")
                     figs = render_visualizations(schedule, assignment, duties, doctors, solver=solver)
                     col1, col2 = st.columns(2)

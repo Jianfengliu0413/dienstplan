@@ -19,7 +19,7 @@ import sys
 import tempfile
 from io import StringIO
 from typing import List, Tuple, Dict
-from visualize import render_visualizations
+
 def create_default_config(config_path: str):
     """Generate a default Rules.xlsx with sample data."""
     with pd.ExcelWriter(config_path, engine='openpyxl') as writer:
@@ -520,55 +520,35 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
         visualize_schedule(schedule, assignment, duties, doctors, output_file.replace('.xlsx', ''))
     except Exception as e:
         print(f"Visualization failed: {e}")
-    
-    figs = render_visualizations(schedule, assignment, duties, doctors, solver=solver)
     return output_file
  
-# def run_scheduler(template_path, output_path, config_path, wishes_path=None, config_dict=None):
-#     """
-#     Run the scheduler. If config_dict is provided, it is used instead of reading from config_path.
-#     """
-#     log_capture = StringIO()
-#     sys.stdout = log_capture
-#     try:
-#         if config_dict is not None:
-#             # Write config_dict to a temporary file
-#             with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-#                 with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
-#                     for sheet, df in config_dict.items():
-#                         # Ensure DataFrame is clean
-#                         df_clean = df.fillna("") if isinstance(df, pd.DataFrame) else pd.DataFrame(df)
-#                         df_clean.to_excel(writer, sheet_name=sheet, index=False)
-#                 temp_path = tmp.name
-#             main(template_path, output_path, temp_path, wishes_file=wishes_path)
-#             os.unlink(temp_path)
-#         else:
-#             main(template_path, output_path, config_path, wishes_file=wishes_path)
-#         success = True
-#     except Exception as e:
-#         success = False
-#         raise e
-#     finally:
-#         sys.stdout = sys.__stdout__
-#     return success, log_capture.getvalue()
-
 def run_scheduler(template_path, output_path, config_path, wishes_path=None, config_dict=None):
+    """
+    Run the scheduler. If config_dict is provided, it is used instead of reading from config_path.
+    """
     log_capture = StringIO()
     sys.stdout = log_capture
     try:
         if config_dict is not None:
-            result = main(template_path, output_path, None, wishes_file=wishes_path, config_dict=config_dict)
+            # Write config_dict to a temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+                with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
+                    for sheet, df in config_dict.items():
+                        # Ensure DataFrame is clean
+                        df_clean = df.fillna("") if isinstance(df, pd.DataFrame) else pd.DataFrame(df)
+                        df_clean.to_excel(writer, sheet_name=sheet, index=False)
+                temp_path = tmp.name
+            main(template_path, output_path, temp_path, wishes_file=wishes_path)
+            os.unlink(temp_path)
         else:
-            result = main(template_path, output_path, config_path, wishes_file=wishes_path)
+            main(template_path, output_path, config_path, wishes_file=wishes_path)
         success = True
-        # result contains (output_file, schedule, assignment, duties, doctors, solver)
     except Exception as e:
         success = False
         raise e
     finally:
         sys.stdout = sys.__stdout__
-    return success, log_capture.getvalue(), result if success else None
-
+    return success, log_capture.getvalue()
 if __name__ == '__main__':
     main(template_file=None, 
          output_file=None, 

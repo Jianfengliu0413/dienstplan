@@ -24,7 +24,7 @@ st.set_page_config(
 
 # --- Fixed Rules file path ---
 RULES_FILE = "Rules_edit.xlsx"
-INACTIVITY_TIMEOUT_SECONDS = 300 # in seconds
+INACTIVITY_TIMEOUT_SECONDS = 10 # in seconds
 
 # --- add a timer --- 
 if 'last_activity' in st.session_state:
@@ -43,7 +43,11 @@ if 'last_activity' in st.session_state:
                     pass
         for key in list(st.session_state.keys()):
             del st.session_state[key]
+        # Set config_loaded to False explicitly
+        st.session_state['config_loaded'] = False
+        # Rerun to go to welcome page
         st.rerun()
+
 st.session_state['last_activity']= datetime.now()
 # --- Custom CSS ---
 st.markdown("""

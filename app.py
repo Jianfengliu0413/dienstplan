@@ -253,6 +253,14 @@ with st.sidebar:
         st.session_state['rules_file_path'] = RULES_FILE
         st.session_state['config_loaded'] = True
         st.session_state['file_hashes']['rules'] = hashlib.md5(rules_file.getvalue()).hexdigest()
+        # Load the config and store it in session state
+        try:
+            config = load_config(RULES_FILE)
+            st.session_state['config'] = config
+        except Exception as e:
+            st.error(f"Failed to load uploaded Rules.xlsx: {e}")
+            st.session_state['config_loaded'] = False
+        st.rerun()
     
     template_file = st.file_uploader("Template (Stationsplan)", type=["xlsx"])
     if template_file is not None:

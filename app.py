@@ -12,7 +12,7 @@ import traceback
 from scheduler import run_scheduler
 from config_loader import load_config
 from datetime import datetime
-
+from visualize import render_visualizations 
 # --- Page config ---
 st.set_page_config(
     page_title=f"IM2 Dienstplan",
@@ -427,6 +427,18 @@ with tab1:
                     st.success("Schedule generated successfully!")
                     st.session_state['output_file'] = output_file
                     st.session_state['log_output'] = log_output
+
+                    # --- Display visualizations ---
+                    st.subheader("Schedule Quality")
+                    figs = render_visualizations(schedule, assignment, duties, doctors, solver=solver)
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.pyplot(figs['heatmap'])
+                        st.pyplot(figs['workload'])
+                    with col2:
+                        st.pyplot(figs['coverage'])
+                        st.pyplot(figs['violations'])
+                    st.pyplot(figs['progress'])
                 else:
                     st.error(f"Scheduler failed. Log:\n{log_output}")
                 

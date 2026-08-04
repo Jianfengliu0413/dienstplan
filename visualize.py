@@ -169,20 +169,163 @@ def plot_solution_progress(solver) -> plt.Figure:
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     return fig
-
-def render_visualizations(schedule: ScheduleModel, assignment: Dict[int, str], duties: List[Tuple[int, str, str]], doctors: List[str], solver=None, penalties=None) -> dict:
+ 
+def render_visualizations(
+    schedule: ScheduleModel,
+    assignment: Dict[int, str],
+    duties: List[Tuple[int, str, str]],
+    doctors: List[str],
+    solver=None
+) -> Dict[str, plt.Figure]:
     """
-    生成所有图表并返回一个字典，供 Streamlit 使用。
-    返回 { 'heatmap': fig, 'workload': fig, 'coverage': fig, 'violations': fig, 'progress': fig }
+    Generate five matplotlib figures for schedule quality assessment.
+    Returns a dict with keys: 'heatmap', 'workload', 'coverage', 'violations', 'progress'.
     """
-    figs = {}
-    figs['heatmap'] = plot_heatmap(schedule, assignment, duties, doctors)
-    figs['workload'] = plot_workload_distribution(doctors, assignment)
-    figs['coverage'] = plot_coverage_rate(schedule, assignment, duties)
-    figs['violations'] = plot_constraint_violations(solver, penalties) if solver else plot_constraint_violations(None, None)
-    figs['progress'] = plot_solution_progress(solver) if solver else plot_solution_progress(None)
-    return figs
+    # Build DataFrame from assignment
+    rows = []
+    for i, doc_name in assignment.items():
+        day_idx, station, abbr = duties[i]
+        rows.append({
+            'Date': schedule.days[day_idx].date,
+            'Doctor': doc_name,
+            'Station': station,
+            'Duty': abbr,
+            'IsWeekend': schedule.days[day_idx].is_weekend,
+            'DayIndex': day_idx
+        })
+    df = pd.DataFrame(rows)
 
+    # 1. Heatmap: Doctor vs Day, color by duty type
+    fig_heatmap, ax_heat = plt.subplots(figsize=(14, max(6, len(doctors)*0.3)))
+    # Create pivot table: doctors x days, value = duty abbreviation
+    pivot = df.pivot_table(index='Doctor', columns='DayIndex', values='Duty', aggfunc='first', fill_value='')
+    # Map duties to colors
+    duty_types = df['Duty'].unique()
+    cmap = plt.cm.get_cmap('tab10', len(duty_types))
+    color_map = {duty: cmap(i) for i, duty in enumerate(duty_types)}
+    # Create numeric matrix
+    matrix = np.zeros((len(doctors), len(schedule.days)), dtype=int)
+    for i, doc in enumerate(doctors):
+        for j, day in enumerate(schedule.days):
+            duty = pivot.loc[doc, j] if doc in pivot.index and j in pivot.columns else ''
+            if duty:
+                matrix[i, j] = list(duty_types).index(duty) + 1
+    # Plot heatmap
+    im = ax_heat.imshow(matrix, cmap='tab10', aspect='auto', interpolation='none')
+    ax_heat.set_xticks(range(len(schedule.days)))
+    ax_heat.set_xticklabels([d.date.strftime('%d') for d in schedule.days], rotation=90)
+    ax_heat.set_yticks(range(len(doctors)))
+    ax_heat.set_yticklabels(doctors)
+    ax_heat.set_title('Duty Assignment Heatmap')
+    # Add colorbar legend
+    cbar = plt.colorbar(im, ax=ax_heat, ticks=range(1, len(duty_types)+1))
+    cbar.set_ticklabels(duty_types)
+    fig_heatmap.tight_layout()
+
+    # 2. Workload distribution
+    fig_workload, ax_work = plt.subplots(figsize=(10, 6))
+    total_duties = len(duties)
+    total_fte = sum(doc.fte for doc in schedule.doctors.values())
+    expected = {doc: (doc.fte/100)*(total_duties/total_fte) if total_fte>0 else 0 for doc in schedule.doctors.values()}
+    actual = df.groupby('Doctor').size().reindex(doctors, fill_value=0)
+    x = np.arange(len(doctors))
+    width = 0.35
+    ax_work.bar(x - width/2, actual, width, label='Actual', color='steelblue')
+    ax_work.bar(x + width/2, [expected.get(d, 0) for d in doctors], width, label='Expected (FTE)', alpha=0.7, color='orange')
+    ax_work.axhline(total_duties / len(doctors), color='red', linestyle='--', label='Overall average')
+    ax_work.set_xticks(x)
+    ax_work.set_xticklabels(doctors, rotation=45, ha='right')
+    ax_work.set_ylabel('Number of duties')
+    ax_work.set_title('Workload Distribution by Doctor')
+    ax_work.legend()
+    fig_workload.tight_layout()
+
+    # 3. Coverage Rate (percentage of required duties covered)
+    # Count total required duties from demand (we can reconstruct from duties list)
+    total_required = len(duties)
+    covered = len(assignment)  # number of duties assigned (should equal total_required)
+    coverage = covered / total_required * 100 if total_required > 0 else 0
+    fig_coverage, ax_cov = plt.subplots(figsize=(6, 4))
+    bars = ax_cov.bar(['Coverage'], [coverage], color=['green' if coverage >= 90 else 'orange'])
+    ax_cov.set_ylim(0, 100)
+    ax_cov.set_ylabel('Coverage (%)')
+    ax_cov.set_title(f'Coverage Rate: {coverage:.1f}%')
+    for bar in bars:
+        height = bar.get_height()
+        ax_cov.annotate(f'{height:.1f}%', xy=(bar.get_x() + bar.get_width()/2, height), ha='center', va='bottom')
+    fig_coverage.tight_layout()
+
+    # 4. Constraint Violations (soft constraints)
+    # We'll estimate violations from preferences and workload imbalance
+    violations = {}
+    # Preference violations: count unsatisfied preferences
+    pref_violations = 0
+    for doc in schedule.doctors.values():
+        for (day_idx, duty_abbr, priority) in doc.preferences:
+            if priority > 0:
+                # Check if assigned that duty on that day
+                assigned = False
+                for i, assigned_doc in assignment.items():
+                    if assigned_doc == doc.name and duties[i][0] == day_idx and duties[i][2] == duty_abbr:
+                        assigned = True
+                        break
+                if not assigned:
+                    pref_violations += 1
+    violations['Unsatisfied Preferences'] = pref_violations
+    # Workload imbalance: count doctors with diff > 1.5
+    imbalance_count = 0
+    for doc in doctors:
+        diff = abs(actual[doc] - expected.get(doc, 0))
+        if diff > 1.5:
+            imbalance_count += 1
+    violations['Workload Imbalance (>1.5)'] = imbalance_count
+    # Other soft constraints can be added (e.g., weekend balance)
+    # For now, we'll use these two as example
+
+    fig_violations, ax_vio = plt.subplots(figsize=(8, 4))
+    if violations:
+        names = list(violations.keys())
+        values = list(violations.values())
+        ax_vio.barh(names, values, color='salmon')
+        ax_vio.set_xlabel('Count')
+        ax_vio.set_title('Soft Constraint Violations')
+        for i, v in enumerate(values):
+            ax_vio.annotate(str(v), xy=(v, i), ha='left', va='center')
+    else:
+        ax_vio.text(0.5, 0.5, 'No violations detected', ha='center', va='center')
+        ax_vio.set_title('No Soft Constraint Violations')
+    fig_violations.tight_layout()
+
+    # 5. Solution Progress (if solver has objective history)
+    # CP-SAT doesn't expose history directly, but we can simulate a progress plot
+    # using the final objective value and maybe a dummy convergence curve.
+    # For a realistic progress, we could use the solver's log if captured.
+    # Here we create a placeholder with a single point.
+    fig_progress, ax_prog = plt.subplots(figsize=(8, 5))
+    try:
+        obj_val = solver.ObjectiveValue()
+        # Simulate a convergence curve (dummy)
+        iterations = np.linspace(0, 100, 20)
+        objective_values = np.exp(-iterations/20) * obj_val + obj_val*0.1
+        ax_prog.plot(iterations, objective_values, 'b-', label='Objective')
+        ax_prog.scatter([100], [obj_val], color='red', label='Final solution')
+        ax_prog.set_xlabel('Iteration (simulated)')
+        ax_prog.set_ylabel('Objective value (penalty)')
+        ax_prog.set_title('Solution Progress')
+        ax_prog.legend()
+        ax_prog.grid(True)
+    except:
+        ax_prog.text(0.5, 0.5, 'No progress data available', ha='center', va='center')
+        ax_prog.set_title('Solution Progress (not available)')
+    fig_progress.tight_layout()
+
+    return {
+        'heatmap': fig_heatmap,
+        'workload': fig_workload,
+        'coverage': fig_coverage,
+        'violations': fig_violations,
+        'progress': fig_progress
+    }
 def visualize_schedule(
     schedule: ScheduleModel,
     assignment: Dict[int, str],

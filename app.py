@@ -13,30 +13,17 @@ import uuid
 from datetime import datetime
 from scheduler import run_scheduler
 from config_loader import load_config
-
-# --- Try to import auto-refresh, fallback gracefully ---
-try:
-    from streamlit_autorefresh import st_autorefresh
-    HAS_AUTOREFRESH = True
-except ImportError:
-    HAS_AUTOREFRESH = False
-    st_autorefresh = None
-
+ 
 # --- Page config ---
 st.set_page_config(
     page_title="IM2 Dienstplan",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
-)
+) 
 
-# --- Auto-refresh every 30 seconds (if available) ---
-if HAS_AUTOREFRESH:
-    st_autorefresh(interval=30000, key="autorefresh")
-else:
-    pass
 # --- Inactivity timeout (seconds) ---
-INACTIVITY_TIMEOUT_SECONDS = 30  # 5 minutes
+INACTIVITY_TIMEOUT_SECONDS = 300  # 5 minutes
 
 # --- Timer check ---
 if 'last_activity' in st.session_state:
@@ -490,6 +477,7 @@ with tab3:
     </div>
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+
 
 # """
 # 260801: v001

@@ -239,8 +239,7 @@ with st.sidebar:
         try:
             config = load_config(rules_path)
             st.session_state['config'] = config
-            st.session_state['config_loaded'] = True
-            st.success("Rules file uploaded and loaded successfully!")
+            st.session_state['config_loaded'] = True 
         except Exception as e:
             st.error(f"Failed to load Rules.xlsx: {e}")
             st.session_state['config_loaded'] = False
@@ -295,7 +294,7 @@ with st.sidebar:
         st.rerun()
 
 # --- Main content ---
-if not st.session_state.get('config_loaded', False):
+if st.session_state.get('config_loaded', False):
     # If the rules file exists but session says not loaded, try to load it
     rules_path = st.session_state.get('rules_file_path')
     if rules_path and os.path.exists(rules_path):
@@ -307,7 +306,7 @@ if not st.session_state.get('config_loaded', False):
         except:
             pass
 
-if not st.session_state.get('config_loaded', False):
+if st.session_state.get('config_loaded', False):
     # Welcome page
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">

@@ -41,8 +41,14 @@ if 'last_activity' in st.session_state:
                     os.unlink(st.session_state[path_key])
                 except:
                     pass
-        for key in list(st.session_state.keys()):
-            del st.session_state[key] 
+        # Clear ALL session state
+        st.session_state.clear()
+        # for key in list(st.session_state.keys()):
+        #     del st.session_state[key]
+
+        # (We can't store it because we cleared everything, so we use a query param)
+        st.query_params["clear"] = str(datetime.now().timestamp())
+
         # Rerun to go to welcome page
         st.rerun()
 

@@ -306,7 +306,7 @@ if st.session_state.get('config_loaded', False):
         except:
             pass
 
-else st.session_state.get('config_loaded', False):
+else:# st.session_state.get('config_loaded', False):
     # Welcome page
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">

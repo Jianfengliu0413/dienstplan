@@ -1,5 +1,4 @@
 # objective.py
-"""soft constraints with penalties"""
 
 from ortools.sat.python import cp_model
 from models import ScheduleModel
@@ -29,102 +28,53 @@ def add_soft_constraints(
     if pref_weight != 0:
         for doc in schedule.doctors.values():
             for (day_idx, duty_abbr, priority) in doc.preferences:
-                # Find duty indices for that day and type
                 duty_indices = [i for i, (d, st, abbr) in enumerate(duties) if d == day_idx and abbr == duty_abbr]
                 if not duty_indices:
                     continue
                 j = doctors.index(doc.name)
                 for i in duty_indices:
-                    # If priority > 0: we want x=1, else we want x=0
                     if priority > 0:
-                        # Penalty if not assigned (1 - x)
                         penalty = model_cp.NewIntVar(0, 1, f'pref_pos_{doc.name}_{i}')
                         model_cp.Add(penalty == 1 - x_vars[(i, j)])
                     else:
-                        # Penalty if assigned (x)
                         penalty = model_cp.NewIntVar(0, 1, f'pref_neg_{doc.name}_{i}')
                         model_cp.Add(penalty == x_vars[(i, j)])
                     penalties.append(pref_weight * abs(priority) * penalty)
 
-    # After preference and before other constraints
+    # 2. Day‑off soft penalty
     day_off_weight = int(penalties_cfg.get('DayOffPenalty', 50))
     if day_off_weight != 0 and hasattr(schedule, 'soft_unavailable'):
         for doc_name, day_idx in schedule.soft_unavailable:
             if doc_name not in doctors:
                 continue
             j = doctors.index(doc_name)
-            # Find all duties on that day
             duty_indices = [i for i, (d, _, _) in enumerate(duties) if d == day_idx]
             if not duty_indices:
                 continue
-            # Penalty if assigned any duty that day: sum over duty_indices of x_vars
-            # Create a boolean that is 1 if any assigned
-            assigned = model_cp.NewIntVar(0, 1, f'dayoff_{doc_name}_{day_idx}')
-            # assigned == 1 if sum(x) > 0
-            model_cp.Add(assigned <= sum(x_vars[(i, j)] for i in duty_indices))
-            # Actually, we want assigned == 1 if sum > 0, but we can use a linear constraint with a big M? Simpler: use a penalty per duty assigned.
-            # We can just add penalty for each duty assignment:
             for i in duty_indices:
                 penalties.append(day_off_weight * x_vars[(i, j)])
 
-    # # 2. Workload balance (based on FTE)
-    # balance_weight = int(penalties_cfg.get('WorkloadBalance', 20))
-    # if balance_weight != 0:
-    #     total_duties = num_duties
-    #     total_fte = sum(doc.fte for doc in schedule.doctors.values())
-    #     for j, doc_name in enumerate(doctors):
-    #         doc = schedule.doctors[doc_name]
-    #         target = (doc.fte / 100) * (total_duties / total_fte) if total_fte > 0 else 0
-    #         assigned = model_cp.NewIntVar(0, total_duties, f'assigned_{j}')
-    #         model_cp.Add(assigned == sum(x_vars[(i, j)] for i in range(num_duties)))
-    #         pos_dev = model_cp.NewIntVar(0, total_duties, f'pos_{j}')
-    #         neg_dev = model_cp.NewIntVar(0, total_duties, f'neg_{j}')
-    #         model_cp.Add(assigned - int(target) == pos_dev - neg_dev)
-    #         penalties.append(balance_weight * pos_dev)
-    #         penalties.append(balance_weight * neg_dev)
-
-    # 2. Workload balance based on HOURS (respects FTE and initial hours)
+    # 3. Workload balance (hours‑based)
     balance_weight = int(penalties_cfg.get('WorkloadBalance', 100))
     if balance_weight != 0:
         total_initial_hours = sum(initial_hours.values())
         total_month_hours = sum(duty_hours)
         total_fte = sum(doc.fte for doc in schedule.doctors.values()) / 100.0
-
-        # For each doctor, compute target this-month hours
+        SCALE = 10
         for j, doc_name in enumerate(doctors):
             doc = schedule.doctors[doc_name]
-            # target final hours = (total_initial + total_month) * (FTE/100) / total_FTE
             target_final = (total_initial_hours + total_month_hours) * (doc.fte / 100) / total_fte if total_fte > 0 else 0
             target_this_month = target_final - initial_hours.get(doc_name, 0.0)
-
-            # assigned hours = sum over duties of (hours * x)
-            assigned_hours = model_cp.NewIntVar(0, int(total_month_hours), f'assigned_hours_{j}')
-            # Build linear expression
-            expr = 0
-            for i in range(num_duties):
-                expr += int(duty_hours[i] * 10) * x_vars[(i, j)]  # use integer scaling (e.g., *10 for 0.1h precision)
-            # But we need to use integer variables; we can scale hours by 10 to keep integers.
-            # However, simpler: round hours to nearest integer? We can treat hours as floats and use integer linear expressions by scaling.
-            # Better: define hours as integers (e.g., 8, 9) and use integer multiplication.
-            # We'll assume hours are integers (e.g., 8, 8.5? we can keep .5 by scaling by 2)
-            # For simplicity, we'll use hours as floats but convert to integer minutes? Let's keep hours as integers (8, 9, etc.) and scale by 2 for half hours.
-            # I'll adjust: we'll store hours as float, but in the objective we use a scale factor of 10 to handle one decimal.
-            # We'll create an expression: sum of (int(duty_hours[i]*10) * x_vars[(i,j)]) then later divide by 10 in target.
-            # But target is also in hours *10.
-            # Let's define a scaling factor SCALE = 10.
-            SCALE = 10
             target_scaled = int(target_this_month * SCALE)
-            # Build expression
             assigned_scaled = model_cp.NewIntVar(0, int(total_month_hours * SCALE), f'assigned_scaled_{j}')
             model_cp.Add(assigned_scaled == sum(int(duty_hours[i] * SCALE) * x_vars[(i, j)] for i in range(num_duties)))
-            # Penalize deviation
             pos_dev = model_cp.NewIntVar(0, int(total_month_hours * SCALE), f'hpos_{j}')
             neg_dev = model_cp.NewIntVar(0, int(total_month_hours * SCALE), f'hneg_{j}')
             model_cp.Add(assigned_scaled - target_scaled == pos_dev - neg_dev)
             penalties.append(balance_weight * pos_dev)
             penalties.append(balance_weight * neg_dev)
     
-    # 3. Weekend balance
+    # 4. Weekend balance (equal distribution)
     weekend_weight = int(penalties_cfg.get('WeekendBalance', 15))
     if weekend_weight != 0:
         weekend_days = [idx for idx, day in enumerate(schedule.days) if day.is_weekend]
@@ -139,23 +89,47 @@ def add_soft_constraints(
                 model_cp.Add(weekend_assigned - int(avg_weekend) == pos_dev - neg_dev)
                 penalties.append(weekend_weight * pos_dev)
                 penalties.append(weekend_weight * neg_dev)
-    # 4. Penalize doctors who work only one day of a weekend (to encourage pairing)
-    pair_weight = int(penalties_cfg.get('WeekendPairing', 10))
-    if pair_weight != 0:
-        weekend_pairs = {}  # (doctor, station, week_number) -> list of duty indices for Saturday and Sunday
-        for i, (day_idx, station, abbr) in enumerate(duties):
-            if schedule.days[day_idx].is_weekend:
-                week_num = schedule.days[day_idx].date.isocalendar().week
-                doc_name = doctors[j]  # we need to loop over doctors? Actually we need to know which doctor is assigned.
-                # We'll create a variable for each doctor-weekend-station that indicates if they work Saturday/Sunday.
-    # 4. Priority of duty types: try to assign high-priority duties to doctors who prefer them?
-    # Already handled via preference, but can add duty priority as a global weight
-    # For simplicity, we'll skip.
-    
-    # 5. Balance KM duties specifically
-    km_weight = int(penalties_cfg.get('KMBalance', 30))  # default 30
+
+    # 5. Weekend pairing and home‑station bonus for PR
+    weekend_pairing_reward = int(penalties_cfg.get('WeekendPairingReward', 30))
+    weekend_single_penalty = int(penalties_cfg.get('WeekendSinglePenalty', 20))
+    weekend_home_bonus = int(penalties_cfg.get('WeekendHomeStationBonus', 10))
+
+    weekend_pr_groups = defaultdict(list)
+    for i, (day_idx, station, abbr) in enumerate(duties):
+        if abbr == 'PR' and schedule.days[day_idx].is_weekend:
+            week_num = schedule.days[day_idx].date.isocalendar().week
+            weekend_pr_groups[(week_num, station)].append(i)
+
+    for (week_num, station), duty_indices in weekend_pr_groups.items():
+        if len(duty_indices) >= 2:
+            duty_indices_sorted = sorted(duty_indices, key=lambda i: duties[i][0])
+            sat_idx = duty_indices_sorted[0]
+            sun_idx = duty_indices_sorted[1] if len(duty_indices_sorted) > 1 else None
+            if sun_idx is None:
+                continue
+            for j in range(num_doctors):
+                both = model_cp.NewBoolVar(f'both_{week_num}_{station}_{j}')
+                model_cp.Add(both <= x_vars[(sat_idx, j)])
+                model_cp.Add(both <= x_vars[(sun_idx, j)])
+                model_cp.Add(both >= x_vars[(sat_idx, j)] + x_vars[(sun_idx, j)] - 1)
+
+                single = model_cp.NewBoolVar(f'single_{week_num}_{station}_{j}')
+                model_cp.Add(single <= x_vars[(sat_idx, j)] + x_vars[(sun_idx, j)])
+                model_cp.Add(single >= x_vars[(sat_idx, j)] - x_vars[(sun_idx, j)])
+                model_cp.Add(single >= x_vars[(sun_idx, j)] - x_vars[(sat_idx, j)])
+
+                penalties.append(-weekend_pairing_reward * both)
+                penalties.append(weekend_single_penalty * single)
+
+                doc = schedule.doctors[doctors[j]]
+                if doc.station == station:
+                    penalties.append(-weekend_home_bonus * x_vars[(sat_idx, j)])
+                    penalties.append(-weekend_home_bonus * x_vars[(sun_idx, j)])
+
+    # 6. Balance KM duties
+    km_weight = int(penalties_cfg.get('KMBalance', 30))
     if km_weight != 0:
-        # find all KM duty indices
         km_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'KM']
         if km_indices:
             avg_km = len(km_indices) / num_doctors if num_doctors > 0 else 0
@@ -168,7 +142,7 @@ def add_soft_constraints(
                 penalties.append(km_weight * pos_dev)
                 penalties.append(km_weight * neg_dev)
 
-    # 6. Cross-station penalty for ZD, SD, HD, NAZ (encourage same-station coverage) 
+    # 7. Cross‑station penalty for ZD/SD/HD/NAZ (encourage same‑station coverage)
     cross_weight = int(penalties_cfg.get('CrossStation', 30))
     if cross_weight != 0:
         for i, (day_idx, station, abbr) in enumerate(duties):
@@ -176,5 +150,38 @@ def add_soft_constraints(
                 for j, doc_name in enumerate(doctors):
                     if schedule.doctors[doc_name].station != station:
                         penalties.append(cross_weight * x_vars[(i, j)])
+
+    # 8. SD balance
+    sd_weight = int(penalties_cfg.get('SDBalance', 20))
+    if sd_weight != 0:
+        sd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'SD']
+        if sd_indices:
+            avg_sd = len(sd_indices) / num_doctors if num_doctors > 0 else 0
+            for j in range(num_doctors):
+                sd_assigned = model_cp.NewIntVar(0, len(sd_indices), f'sd_{j}')
+                model_cp.Add(sd_assigned == sum(x_vars[(i, j)] for i in sd_indices))
+                pos_dev = model_cp.NewIntVar(0, len(sd_indices), f'sd_pos_{j}')
+                neg_dev = model_cp.NewIntVar(0, len(sd_indices), f'sd_neg_{j}')
+                model_cp.Add(sd_assigned - int(avg_sd) == pos_dev - neg_dev)
+                penalties.append(sd_weight * pos_dev)
+                penalties.append(sd_weight * neg_dev)
+
+    # 9. Consecutive ZD reward
+    zd_consecutive_reward = int(penalties_cfg.get('ZDConsecutiveReward', 50))
+    zd_duty_map = {}
+    for i, (day_idx, station, abbr) in enumerate(duties):
+        if abbr == 'ZD':
+            zd_duty_map[(day_idx, station)] = i
+
+    for (day_idx, station), i in zd_duty_map.items():
+        if day_idx > 0:
+            prev_i = zd_duty_map.get((day_idx-1, station))
+            if prev_i is not None:
+                for j in range(num_doctors):
+                    consecutive = model_cp.NewBoolVar(f'consec_zd_{i}_{j}')
+                    model_cp.Add(consecutive <= x_vars[(i, j)])
+                    model_cp.Add(consecutive <= x_vars[(prev_i, j)])
+                    model_cp.Add(consecutive >= x_vars[(i, j)] + x_vars[(prev_i, j)] - 1)
+                    penalties.append(-zd_consecutive_reward * consecutive)
 
     return penalties

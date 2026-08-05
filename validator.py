@@ -4,7 +4,7 @@ Checks data integrity before solving.
 """
 
 from models import ScheduleModel, Station
-from demand_builder import build_demand
+from demand_builder import build_demand, GLOBAL_STATION
 import pandas as pd
 
 def validate(model: ScheduleModel, config: dict) -> list:
@@ -36,6 +36,8 @@ def validate(model: ScheduleModel, config: dict) -> list:
     # Check that every station with demand has at least one doctor
     stations_with_demand = set([st for (_, st) in demand.keys()])
     for st_name in stations_with_demand:
+        if st_name == GLOBAL_STATION:   # import GLOBAL_STATION
+            continue
         if st_name != 'Global':
             doctors_in_station = [doc for doc in model.doctors.values() if doc.station == st_name]
             if not doctors_in_station:

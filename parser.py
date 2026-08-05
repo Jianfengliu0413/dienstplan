@@ -9,7 +9,8 @@ import re
 import os
 import pandas as pd
 from models import ScheduleModel, Doctor, Day, DutyType, Station
- 
+from demand_builder import GLOBAL_DUTIES, GLOBAL_STATION
+
 def is_dark_green(rgb_hex: str, tolerance: int = 10) -> bool:
     """Dark green: G > R and G > B with low brightness."""
     if len(rgb_hex) == 8:
@@ -153,12 +154,26 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
         raise ValueError("No valid date headers found in row 1.")
 
     print(f"Parsed {len(days)} days, first date: {days[0].date.strftime('%Y-%m-%d')}")
-
+    
     # --- 2. Create the model and set basic attributes ---
     model = ScheduleModel()
     model.days = days
     model.day_col = day_cols
     model.sheet_name = sheet_name
+
+    # Spätdienst IMA row
+    ima_sd_days = set()
+    for row in range(2, ws.max_row + 1):
+        cell_a = ws.cell(row=row, column=1)
+        if cell_a.value and str(cell_a.value).strip() == 'Spätdienst IMA':
+            for col, day_idx in day_cols.items():
+                cell = ws.cell(row=row, column=col)
+                if cell.value and str(cell.value).strip() == 'SD':
+                    ima_sd_days.add(day_idx)
+            break
+
+    model.ima_sd_days = ima_sd_days
+    print(f"[IMA] SD covered on days: {sorted(ima_sd_days)}")
 
     # --- 3. Build duty types from config (or fallback) ---
     duty_cfg = config.get('DutyTypes', pd.DataFrame())
@@ -340,17 +355,17 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                 zero_days.add(day_idx)
         if station_name in model.stations:
             model.station_zero_days[station_name] = zero_days
-
+    model.stations['Global'] = Station(name='Global', requires_senior=False)
     # --- 8. Define default Active/Weekend based on station ---
     station_defaults = {
         'Sprechstunde PP/Oberärzte': ('No', 'No'),
         'Springer/Konsile/Diagnostik': ('No', 'Yes'),
         '93 (3 IS)': ('No', 'Yes'),
-        'Rotation Med I': ('No', 'Yes'),
-        'Rotation': ('No', 'Yes'),
+        'Rotation Med I': ('Yes', 'Yes'),
+        'Rotation': ('Yes', 'Yes'),
         'Aufnahme': ('No', 'No'),
         'Forschung': ('No', 'Yes'),
-        'Balingen': ('No', 'Yes'),
+        'Balingen': ('Yes', 'Yes'),
         'Elternzeit': ('No', 'No'),
         "Ambulanzen": ('No', 'No'),
     }
@@ -365,6 +380,9 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
     model._active_override = {}
     model._weekend_override = {}
     model._inactive_doctors = {}   # store inactive doctors separately
+
+    # Load the Doctors sheet from config once
+    doctors_df = config.get('Doctors', pd.DataFrame())
 
     for row, name, fte, station in doctor_rows:
         if name in seen_doctors:
@@ -383,6 +401,19 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
         # Store overrides for all doctors (for writing the sheet)
         model._active_override[name] = active_default
         model._weekend_override[name] = weekend_default
+        
+        # Read Allow92KMT and AllowNAZ from config
+        allow_92_kmt = False
+        allow_naz = False
+        if not doctors_df.empty:
+            doc_row = doctors_df[doctors_df['Name'] == name]
+            if not doc_row.empty:
+                if 'Allow92KMT' in doctors_df.columns:
+                    val = str(doc_row.iloc[0].get('Allow92KMT', 'No')).strip().upper()
+                    allow_92_kmt = val == 'YES'
+                if 'AllowNAZ' in doctors_df.columns:
+                    val = str(doc_row.iloc[0].get('AllowNAZ', 'No')).strip().upper()
+                    allow_naz = val == 'YES'
 
         # Only add ACTIVE doctors to the model (they will be used by the solver)
         if active_default == 'Yes':
@@ -390,7 +421,9 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                 name=name,
                 fte=fte,
                 station=station,
-                weekend_available=(weekend_default == 'Yes')
+                weekend_available=(weekend_default == 'Yes'),
+                allow_92_kmt=allow_92_kmt,
+                allow_naz=allow_naz
             )
             model.doctors[name] = doc
             model.doctor_row[name] = row
@@ -653,20 +686,22 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
                 duty_abbr = norm_upper
                 # Add as a preference (high priority)
                 model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
-                print(f"[WISH] (duty): {doc_name} wants {duty_abbr} on {model.days[day_idx].date} (priority 100)")
-
-                # --- Make it a FIXED assignment at the doctor's own station ---
-                doc_station = model.doctors[doc_name].station
-                if doc_station:
-                    model.fixed_assignments.append((doc_name, day_idx, doc_station, duty_abbr))
-                    print(f"[FIXED] (duty): {doc_name} must work {duty_abbr} at {doc_station} on {model.days[day_idx].date}")
-                    # Auto‑add the skill if missing (so solver doesn't reject it)
+                # print(f"[WISH] (duty): {doc_name} wants {duty_abbr} on {model.days[day_idx].date} (priority 100)")
+    
+                # Determine station for fixed assignment
+                if duty_abbr in GLOBAL_DUTIES:
+                    station = GLOBAL_STATION
+                else:
+                    station = model.doctors[doc_name].station
+                if station:
+                    model.fixed_assignments.append((doc_name, day_idx, station, duty_abbr))
+                    # print(f"[FIXED] (duty): {doc_name} must work {duty_abbr} at {station} on {model.days[day_idx].date}")
                     if duty_abbr not in model.doctors[doc_name].skills:
                         model.doctors[doc_name].skills.add(duty_abbr)
-                        print(f"   ➕ Auto‑added skill {duty_abbr} to {doc_name}")
+                        print(f"Auto‑added skill {duty_abbr} to {doc_name}")
                 else:
                     print(f"Could not add fixed assignment: {doc_name} has no station.")
-                continue  # skip further checks
+                continue # skip further checks
 
             # ---------- 2. Check fixed values → unavailable ----------
             is_fixed = False

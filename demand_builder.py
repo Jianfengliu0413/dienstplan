@@ -13,6 +13,10 @@ NO_SUBSTITUTE_STATIONS = {'Rotation Med I', 'Aufnahme', 'Labor', 'Forschung', 'E
                           'Amb 3 (spezialisiert mix)','Amb 4 (Myelom)','KMT 1','KMT 2','Rheuma 1','Rheuma 2','Rheuma 3'
                           }
 
+MAIN_STATIONS = {'65 PP', '65 LAF', '85 Häm/Onk/Rheu', '92 KMT'}
+GLOBAL_STATION = 'Global'
+GLOBAL_DUTIES = {'HD', 'NAZ', 'SD'}
+
 def build_demand(model: ScheduleModel, config: dict) -> dict:
     demand = defaultdict(lambda: defaultdict(int))
 
@@ -31,6 +35,9 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
             for part in wd_str.split(','):
                 if '=' in part:
                     abbr, cnt = part.strip().split('=')
+                    # Skip SD for main stations (will be added globally)
+                    if abbr == 'SD' and name in MAIN_STATIONS:
+                        continue
                     weekday_counts[abbr.strip()] = int(cnt)
 
         we_str = str(row.get('WeekendDutyCounts', ''))
@@ -38,6 +45,11 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
             for part in we_str.split(','):
                 if '=' in part:
                     abbr, cnt = part.strip().split('=')
+                    # Skip HD? We'll let HD be handled by DayDemand or global merging
+                    # For now, we don't skip HD; we'll merge later.
+                    # But we might also want to skip HD from stations to avoid duplicates.
+                    if abbr == 'HD':
+                        continue  # skip HD from stations, handled by DayDemand or global
                     weekend_counts[abbr.strip()] = int(cnt)
 
         if not weekday_counts and not weekend_counts:
@@ -60,6 +72,8 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
         for _, row in df_day.iterrows():
             station = str(row['Station']).strip()
             day_name = str(row['DayOfWeek']).strip().lower()
+            if station in ['GlobalHD', 'GlobalSD']:
+                station = GLOBAL_STATION
             duty = str(row['DutyType']).strip()
             count = int(row['Count'])
             if station in model.stations:
@@ -89,7 +103,27 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
                 if cnt > 0:
                     demand[(day_idx, station_name)][duty] += cnt
 
-    # ========== NEW: Add fixed assignments to the demand ==========
+    # --- Add global SD duty on weekdays not covered by IMA ---
+    for day_idx, day in enumerate(model.days):
+        if not day.is_weekend and day_idx not in getattr(model, 'ima_sd_days', set()):
+            # Check if there is already a demand for this day? Not needed.
+            demand[(day_idx, GLOBAL_STATION)]['SD'] = 1
+
+    # --- Merge HD duties: only one HD per day, set to GlobalHD ---
+    # Collect HD demands
+    hd_demands = {}
+    for (day_idx, station), counts in list(demand.items()):
+        if 'HD' in counts:
+            hd_demands.setdefault(day_idx, []).append((station, counts['HD']))
+            # Remove this HD from demand
+            del counts['HD']
+            if not counts:
+                del demand[(day_idx, station)]
+    # Add one HD per day (if there was any demand)
+    for day_idx in hd_demands:
+        demand[(day_idx, GLOBAL_STATION)]['HD'] = 1  
+
+    # ========== Add fixed assignments to the demand ==========
     if hasattr(model, 'fixed_assignments'):
         for doc_name, day_idx, station, duty_abbr in model.fixed_assignments:
             # Only add if the duty is known and the station exists
@@ -97,8 +131,8 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
                 # Ensure at least one slot for this duty on this day/station
                 demand[(day_idx, station)][duty_abbr] = max(demand[(day_idx, station)].get(duty_abbr, 0), 1)
             else:
-                print(f"⚠️ Warning: Cannot add fixed assignment for {duty_abbr} at {station} – duty or station unknown.")
-
+                print(f"[Warning]: Cannot add fixed assignment for {duty_abbr} at {station} – duty or station unknown.")
+ 
     # 4. SUBSTITUTION LOGIC
     demand = add_substitute_demand(model, demand)
 

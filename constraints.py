@@ -1,7 +1,7 @@
 # constraints.py
 from ortools.sat.python import cp_model
 from models import ScheduleModel
-from demand_builder import build_demand
+from demand_builder import build_demand, GLOBAL_STATION, MAIN_STATIONS
 from collections import defaultdict
 import pandas as pd
 from typing import List, Dict, Tuple
@@ -45,14 +45,58 @@ def add_hard_constraints(
 
     # 3. Station match
     for i, (day_idx, station, abbr) in enumerate(duties):
-        if abbr == 'SUB':
-            allowed = [j for j, doc_name in enumerate(doctors) 
-                    if schedule.doctors[doc_name].station == '65 PP']
-        elif schedule.days[day_idx].is_weekend and abbr == 'PR':
-            allowed = list(range(num_doctors))
+        if station == GLOBAL_STATION:
+            if abbr == 'SD':
+                # Prefer main‑station doctors, but fallback to all if none available
+                main_allowed = [j for j, doc_name in enumerate(doctors)
+                                if schedule.doctors[doc_name].station in MAIN_STATIONS]
+                if main_allowed:
+                    allowed = main_allowed
+                else:
+                    allowed = list(range(num_doctors))
+                    print(f"Global SD on day {day_idx}: no main‑station doctors – allowing all")
+            else:
+                allowed = list(range(num_doctors))
         else:
-            allowed = [j for j, doc_name in enumerate(doctors) 
-                    if schedule.doctors[doc_name].station == station or station == 'Global']
+            if abbr == 'SUB':
+                allowed = [j for j, doc_name in enumerate(doctors) 
+                        if schedule.doctors[doc_name].station == '65 PP']
+            elif schedule.days[day_idx].is_weekend and abbr == 'PR':
+                allowed = list(range(num_doctors))
+            else:
+                if abbr == 'SD':
+                    # Station‑specific SD: only doctors from the same station
+                    allowed = [j for j, doc_name in enumerate(doctors)
+                            if schedule.doctors[doc_name].station == station]
+                else:
+                    # ZD and other weekdays: prefer same station, else any doctor
+                    home_doctors = [j for j, doc_name in enumerate(doctors)
+                                    if schedule.doctors[doc_name].station == station]
+                    # Filter out unavailable and those already fixed to another duty that day
+                    available_home = []
+                    for j in home_doctors:
+                        doc_name = doctors[j]
+                        if (doc_name, day_idx) in schedule.unavailable:
+                            continue
+                        if any(d == day_idx for _, d, _, _ in schedule.fixed_assignments if _ == doc_name):
+                            continue
+                        available_home.append(j)
+                    if available_home:
+                        allowed = available_home
+                    else:
+                        # Fallback: any doctor not unavailable and not fixed that day
+                        fallback = [j for j, doc_name in enumerate(doctors)
+                                    if (doc_name, day_idx) not in schedule.unavailable
+                                    and not any(d == day_idx for _, d, _, _ in schedule.fixed_assignments if _ == doc_name)]
+                        if fallback:
+                            allowed = fallback
+                        else:
+                            # Ultimate fallback: all doctors (vacation/fixed constraints will block)
+                            allowed = list(range(num_doctors))
+                            print(f"ZD on day {day_idx}, station {station}: no eligible doctors – allowing all")
+        # Ensure allowed is never empty
+        if not allowed:
+            raise ValueError(f"No allowed doctors for duty {i}: day={day_idx}, station='{station}', abbr='{abbr}'")
         model_cp.Add(sum(x_vars[(i, j)] for j in allowed) == 1)
 
     # 3.2 Special rule for SUB duties: only doctors from 65 PP can cover
@@ -185,3 +229,65 @@ def add_hard_constraints(
                     duty_indices_in_week = [i for i, (d, _, _) in enumerate(duties) if d in day_indices]
                     if duty_indices_in_week:
                         model_cp.Add(sum(x_vars[(i, j)] for i in duty_indices_in_week) <= max_week)
+
+    # 13. Special: Weekend PR at 92 KMT only for doctors with allow_92_kmt=True ---
+    allowed_92_indices = [
+        j for j, doc_name in enumerate(doctors)
+        if schedule.doctors[doc_name].allow_92_kmt
+    ]
+    for i, (day_idx, station, abbr) in enumerate(duties):
+        if station == '92 KMT' and schedule.days[day_idx].is_weekend and abbr == 'PR':
+            if allowed_92_indices:
+                model_cp.Add(sum(x_vars[(i, j)] for j in allowed_92_indices) == 1)
+            else:
+                # No allowed doctors – force infeasible if such duty exists
+                model_cp.Add(0 == 1)
+
+    # 14. NAZ shifts: only doctors with allow_naz=True ---
+    allowed_naz_indices = [
+        j for j, doc_name in enumerate(doctors)
+        if schedule.doctors[doc_name].allow_naz
+    ]
+    for i, (day_idx, station, abbr) in enumerate(duties):
+        if abbr == 'NAZ':
+            if allowed_naz_indices:
+                model_cp.Add(sum(x_vars[(i, j)] for j in allowed_naz_indices) == 1)
+            else:
+                model_cp.Add(0 == 1)
+    # --- 15. Max house shifts (HD) per doctor ---
+    max_pr_weekend = int(general.get('MaxWeekendPRPerDoctor', 1))
+    max_naz = int(general.get('MaxNAZPerDoctor', 2))
+
+    # For PR on weekends:
+    if constraints_cfg.get('MaxWeekendPR', 'Yes') == 'Yes':
+        for j in range(num_doctors):
+            pr_weekend_indices = [
+                i for i, (day_idx, station, abbr) in enumerate(duties)
+                if abbr == 'PR' and schedule.days[day_idx].is_weekend
+            ]
+            if pr_weekend_indices:
+                model_cp.Add(sum(x_vars[(i, j)] for i in pr_weekend_indices) <= max_pr_weekend)
+
+    # For NAZ:
+    if constraints_cfg.get('MaxNAZ', 'Yes') == 'Yes':
+        for j in range(num_doctors):
+            naz_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'NAZ']
+            if naz_indices:
+                model_cp.Add(sum(x_vars[(i, j)] for i in naz_indices) <= max_naz)
+
+
+    # --- 16. Max house shifts (HD) per doctor ---
+    max_hd_per_doctor = int(general.get('MaxHouseShifts', 2))
+    if constraints_cfg.get('MaxHouseShifts', 'Yes') == 'Yes':
+        for j in range(num_doctors):
+            hd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'HD']
+            if hd_indices:
+                model_cp.Add(sum(x_vars[(i, j)] for i in hd_indices) <= max_hd_per_doctor)
+
+    # --- 17. Max SD per doctor (to avoid concentration) ---
+    max_sd_per_doctor = int(general.get('MaxSDPerDoctor', 4))   # default 4
+    if constraints_cfg.get('MaxSD', 'Yes') == 'Yes':
+        for j in range(num_doctors):
+            sd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'SD']
+            if sd_indices:
+                model_cp.Add(sum(x_vars[(i, j)] for i in sd_indices) <= max_sd_per_doctor)

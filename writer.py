@@ -1,12 +1,18 @@
 # # writer.py 
 import openpyxl
 from openpyxl.utils import get_column_letter
+from openpyxl.styles import PatternFill
 from models import ScheduleModel
 import pandas as pd
 from statistics import generate_statistics
 from report import generate_conflict_report, generate_explanation
 from typing import Dict, List, Tuple
 from datetime import datetime
+from demand_builder import GLOBAL_STATION
+RED_FILL = PatternFill(start_color='F1CDB1', end_color='F1CDB1', fill_type='solid')
+ORANGE_FILL = PatternFill(start_color='F5C242', end_color='F5C242', fill_type='solid')
+BLUE_FILL = PatternFill(start_color='B7C5E4', end_color='B7C5E4', fill_type='solid')
+
 def write_output(
     template_path: str,
     output_path: str,
@@ -18,6 +24,8 @@ def write_output(
     solver,
     suggestions_df: pd.DataFrame = None
 ) -> None:
+
+    
     wb = openpyxl.load_workbook(template_path)
     sheet_name = getattr(schedule, 'sheet_name', None)
     if not sheet_name or sheet_name not in wb.sheetnames:
@@ -79,18 +87,32 @@ def write_output(
             col = col_for_day.get(day_idx)
             if col is not None and (row, col) in schedule.editable_cells:
                 try:
-                    doc_station = schedule.doctors[doc_name].station
-                    if schedule.days[day_idx].is_weekend:
-                        # Weekends: write full station name
-                        ws.cell(row=row, column=col).value = station
+                    if station == GLOBAL_STATION:  # import GLOBAL_STATION from demand_builder
+                        ws.cell(row=row, column=col).value = abbr
+
                     else:
-                        # Weekdays: if the duty station differs from doctor's station,
-                        # write the station code of the target station, otherwise write abbreviation.
-                        if doc_station != station and abbr in ['ZD', 'SD', 'HD', 'NAZ']:
-                            code = station_code_map_rev.get(station, station)
+                        doc_station = schedule.doctors[doc_name].station
+                        if schedule.days[day_idx].is_weekend:
+                            code = station_code_map_rev.get(station, station).upper()
                             ws.cell(row=row, column=col).value = code
+                            # Apply red fill for cross‑station weekend assignments
+                            if doc_station != station:
+                                ws.cell(row=row, column=col).fill = RED_FILL
                         else:
-                            ws.cell(row=row, column=col).value = abbr
+                            # Weekdays: if the duty station differs from doctor's station,
+                            # write the station code of the target station, otherwise write abbreviation.
+                            if doc_station != station and abbr in ['ZD', 'SD', 'HD', 'NAZ']:
+                                code = station_code_map_rev.get(station, station).upper()
+                                ws.cell(row=row, column=col).value = code
+                            else:
+                                ws.cell(row=row, column=col).value = abbr
+
+                    # --- Apply fill ---
+                    if abbr == 'ZD':
+                        ws.cell(row=row, column=col).fill = BLUE_FILL
+                    if abbr == 'SD':
+                        ws.cell(row=row, column=col).fill = ORANGE_FILL
+
                 except Exception:
                     pass
 
@@ -106,7 +128,9 @@ def write_output(
                     if abbr == 'PR':
                         # PR on weekend → show station; on weekdays → show "PR"
                         if schedule.days[day_idx].is_weekend:
-                            ws.cell(row=row, column=col).value = station
+                            # Write station code (uppercase) instead of full name
+                            code = station_code_map_rev.get(station, station).upper()
+                            ws.cell(row=row, column=col).value = code
                         else:
                             ws.cell(row=row, column=col).value = abbr
                     else:

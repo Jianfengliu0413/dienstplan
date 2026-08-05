@@ -11,6 +11,9 @@ class Doctor:
     skills: Set[str] = field(default_factory=set)   # duty abbreviations they can do
     preferences: List[tuple] = field(default_factory=list)  # (day_idx, duty_abbr, priority)
     weekend_available: bool = True
+    allow_92_kmt: bool = False
+    allow_naz: bool = False
+    
 
 @dataclass
 class DutyType:
@@ -54,3 +57,4 @@ class ScheduleModel:
     fixed_assignments: List[Tuple[str, int, str, str]] = field(default_factory=list)  # (doctor, day_idx, station, duty_abbr)
     # In models.py, add to ScheduleModel
     station_zero_days: Dict[str, Set[int]] = field(default_factory=dict)  # station -> set of day_idx where row has '0'
+    ima_sd_days: Set[int] = field(default_factory=set)  # days where IMA covers SD

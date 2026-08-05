@@ -36,9 +36,12 @@ INACTIVITY_TIMEOUT_SECONDS = 30 # in seconds
 #         return username == st.secrets["auth"]["username"] and password == st.secrets["auth"]["password"]
 #     # Option 2: hardcoded fallback (change these)
 #     return username == "admin" and password == "password" 
-def check_credentials(city, password):
-    # Both must be exactly "Tübingen"
-    return city == "Tübingen" and password == "Tübingen"
+
+# --- Authentication: only a city name is required ---
+def check_city(city):
+    # Case-insensitive, strip extra spaces
+    return city.strip().lower() == "tübingen"
+
 # --- Authentication check ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -240,19 +243,21 @@ st.markdown("""
 
 
 # --- LOGIN PAGE (shown if not authenticated) --- 
-with st.form("login_form"):
-    city = st.text_input("Which city are you?")          # instead of "Username"
-    password = st.text_input("Password", type="password")
-    submitted = st.form_submit_button("Log in")
-    if submitted:
-        if check_credentials(city, password):
-            st.session_state["authenticated"] = True
-            st.session_state["last_activity"] = datetime.now()
-            st.rerun()
-        else:
-            st.error("Invalid city or password")
-# --- If authenticated, continue with the normal app ---
-
+with st.form("login_form"): 
+    with st.container():
+        st.markdown('<div class="login-container">', unsafe_allow_html=True)
+        with st.form("login_form"):
+            city = st.text_input("Which city are you?")
+            submitted = st.form_submit_button("Log in")
+            if submitted:
+                if check_city(city):
+                    st.session_state["authenticated"] = True
+                    st.session_state["last_activity"] = datetime.now()
+                    st.rerun()
+                else:
+                    st.error("Invalid city – please try again")
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()  # Prevent any further rendering
 # --- Session state ---
 if 'initialized' not in st.session_state:
     st.session_state.clear()

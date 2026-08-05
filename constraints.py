@@ -63,6 +63,33 @@ def add_hard_constraints(
                         if schedule.doctors[doc_name].station == '65 PP']
             elif schedule.days[day_idx].is_weekend and abbr == 'PR':
                 allowed = list(range(num_doctors))
+                # # 
+                # # Prefer doctors from the same station
+                # home_doctors = [j for j, doc_name in enumerate(doctors)
+                #                 if schedule.doctors[doc_name].station == station]
+                # # Filter out unavailable and those already fixed to another duty that day
+                # available_home = []
+                # for j in home_doctors:
+                #     doc_name = doctors[j]
+                #     if (doc_name, day_idx) in schedule.unavailable:
+                #         continue
+                #     if any(d == day_idx for _, d, _, _ in schedule.fixed_assignments if _ == doc_name):
+                #         continue
+                #     available_home.append(j)
+                # if available_home:
+                #     allowed = available_home
+                # else:
+                #     # Fallback: any doctor not unavailable and not fixed that day
+                #     fallback = [j for j, doc_name in enumerate(doctors)
+                #                 if (doc_name, day_idx) not in schedule.unavailable
+                #                 and not any(d == day_idx for _, d, _, _ in schedule.fixed_assignments if _ == doc_name)]
+                #     if fallback:
+                #         allowed = fallback
+                #     else:
+                #         allowed = list(range(num_doctors))
+                #         print(f"PR on day {day_idx}, station {station}: no eligible doctors – allowing all")
+
+            
             else:
                 if abbr == 'SD':
                     # Station‑specific SD: only doctors from the same station

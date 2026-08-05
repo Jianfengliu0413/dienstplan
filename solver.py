@@ -55,7 +55,7 @@ def solve_schedule(
             duty_i = duty_map[(day_idx, station, duty_abbr)]
             doctor_j = doctors.index(doc_name)
             model_cp.Add(x[(duty_i, doctor_j)] == 1)
-            print(f"[FIXED]: {doc_name} must do {duty_abbr} at {station} on day {day_idx}")
+            print(f"[FIXED]: {doc_name} want {duty_abbr} at {station} on day {day_idx}")
         else:
             print(f"[Warning]: Fixed assignment for {doc_name} on {day_idx} {station} {duty_abbr} not found in duties.")
 
@@ -129,7 +129,7 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
             duty_i = duty_map[(day_idx, station, duty_abbr)]
             doctor_j = doctors.index(doc_name)
             model_cp.Add(x[(duty_i, doctor_j)] == 1)
-            print(f"REPAIR FIXED: {doc_name} must do {duty_abbr} at {station} on day {day_idx}")
+            print(f"REPAIR FIXED: {doc_name} want {duty_abbr} at {station} on day {day_idx}")
         else:
             print(f"Warning: Fixed assignment for {doc_name} on {day_idx} {station} {duty_abbr} not found in duties.")
 

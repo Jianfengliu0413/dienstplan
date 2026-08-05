@@ -25,7 +25,7 @@ st.set_page_config(
 
 # --- Fixed Rules file path ---
 RULES_FILE = "Rules_edit.xlsx"
-INACTIVITY_TIMEOUT_SECONDS = 30 # in seconds
+INACTIVITY_TIMEOUT_SECONDS = 300 # in seconds
 
 
 # --- Credentials ---

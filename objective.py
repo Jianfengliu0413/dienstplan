@@ -143,10 +143,10 @@ def add_soft_constraints(
                 penalties.append(km_weight * neg_dev)
 
     # 7. Cross‑station penalty for ZD/SD/HD/NAZ (encourage same‑station coverage)
-    cross_weight = int(penalties_cfg.get('CrossStation', 30))
+    cross_weight = int(penalties_cfg.get('CrossStation', 150))
     if cross_weight != 0:
         for i, (day_idx, station, abbr) in enumerate(duties):
-            if abbr in ['ZD', 'SD', 'HD', 'NAZ'] and station != 'Global':
+            if abbr in ['ZD', 'SD', 'HD', 'NAZ', 'PR'] and station != 'Global':
                 for j, doc_name in enumerate(doctors):
                     if schedule.doctors[doc_name].station != station:
                         penalties.append(cross_weight * x_vars[(i, j)])

@@ -397,8 +397,8 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
 
     # # Always write detected doctors and stations back to Rules.xlsx
     # write_missing_config_sheets(schedule, config_path)
-    # write_skills_auto(schedule, config_path)
-    # print("Doctors and Stations sheets updated from template.")
+    write_skills_auto(schedule, config_path)
+    print("Doctors and Stations sheets updated from template.")
 
     # Reload config: to pick up the newly written sheets
     config = load_config(config_path)   # now the Doctors sheet reflects the template
@@ -442,7 +442,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
             # print("Configuration incomplete: missing skills and/or station duty counts.")
             # print("Generating missing sheets with detected doctors and stations...")
             # write_missing_config_sheets(schedule, config_path)
-            # write_skills_auto(schedule, config_path)
+            write_skills_auto(schedule, config_path)
             # print("\nPlease open Rules.xlsx and fill in:")
             # print("  - Skills sheet: assign each doctor their duty types (SD, ZD, KM, etc.)")
             # print("  - Stations sheet: add DutyCounts (e.g., 'SD=2, ZD=1, KM=1')")
@@ -549,6 +549,8 @@ def run_scheduler(template_path, output_path, config_path, wishes_path=None, con
     finally:
         sys.stdout = sys.__stdout__
     return success, log_capture.getvalue()
+
+
 if __name__ == '__main__':
     main(template_file=None, 
          output_file=None, 

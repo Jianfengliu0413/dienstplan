@@ -247,21 +247,21 @@ st.markdown("""
 # --- LOGIN PAGE (shown only if not authenticated) ---
 if not st.session_state["authenticated"]:
     # ---- Background image and overlay ----
-    st.markdown("""
-    <style> 
-        /* Dark overlay to improve text readability */
-        .login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 1;
-            background: rgba(0, 0, 0, 0.45);
-            backdrop-filter: blur(2px);
-        } 
-    </style>
-    """, unsafe_allow_html=True)
+    # st.markdown("""
+    # <style> 
+    #     /* Dark overlay to improve text readability */
+    #     .login-overlay {
+    #         position: fixed;
+    #         top: 0;
+    #         left: 0;
+    #         width: 100vw;
+    #         height: 100vh;
+    #         z-index: 1;
+    #         background: rgba(0, 0, 0, 0.45);
+    #         backdrop-filter: blur(2px);
+    #     } 
+    # </style>
+    # """, unsafe_allow_html=True)
 
     # ---- Background elements ----
     st.markdown('<div class="login-bg"></div><div class="login-overlay"></div>', unsafe_allow_html=True)

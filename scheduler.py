@@ -139,6 +139,7 @@ def get_default_station_code_map() -> pd.DataFrame:
         ("999", "Elternzeit"),
     ]
     return pd.DataFrame(data, columns=["Code", "Station"])
+
 def write_missing_config_sheets(model: ScheduleModel, config_path: str):
     from openpyxl import load_workbook
     import pandas as pd
@@ -396,7 +397,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
     schedule = parse_template(template_file, config, wishes_path=wishes_file)
 
     # # Always write detected doctors and stations back to Rules.xlsx
-    # write_missing_config_sheets(schedule, config_path)
+    write_missing_config_sheets(schedule, config_path)
     write_skills_auto(schedule, config_path)
     print("Doctors and Stations sheets updated from template.")
 
@@ -441,7 +442,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
         if (missing_skills or missing_demand) and not other_errors:
             # print("Configuration incomplete: missing skills and/or station duty counts.")
             # print("Generating missing sheets with detected doctors and stations...")
-            # write_missing_config_sheets(schedule, config_path)
+            write_missing_config_sheets(schedule, config_path)
             write_skills_auto(schedule, config_path)
             # print("\nPlease open Rules.xlsx and fill in:")
             # print("  - Skills sheet: assign each doctor their duty types (SD, ZD, KM, etc.)")

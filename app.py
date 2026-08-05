@@ -243,32 +243,165 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True) 
 
+
 # --- LOGIN PAGE (shown only if not authenticated) ---
 if not st.session_state["authenticated"]:
+    # ---- Background image and overlay ----
     st.markdown("""
-    <div style="text-align: center; margin-bottom: 1rem;">
-        <h3 style="color: #1a1a2e; font-weight: 300; font-size: 1.8rem; margin: 0.2rem 0;">IM2 Dienstplan</h3>
-        <hr style="width: 200px; border: 1px solid #2E86C1; margin: 0rem auto;">
-        <p style="color: #6c757d;">Please log in to continue</p>
+    <style>
+        /* Full-page background container */
+        .login-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            background: url('https://images.unsplash.com/photo-1590079832675-8b3e59c438bf?w=1600&q=80') no-repeat center center/cover;
+        }
+        /* Dark overlay to improve text readability */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(2px);
+        }
+        /* Card container – sits on top */
+        .login-wrapper {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        /* Modern login card – glass style */
+        .login-card {
+            max-width: 420px;
+            width: 100%;
+            padding: 2.5rem 2rem;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 32px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .login-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.3);
+        }
+        .login-card .logo-area {
+            text-align: center;
+            margin-bottom: 1.8rem;
+        }
+        .login-card .logo-area h2 {
+            font-weight: 600;
+            font-size: 2rem;
+            color: #1a1a2e;
+            letter-spacing: -0.5px;
+            margin: 0;
+        }
+        .login-card .logo-area .subhead {
+            color: #4a4a5a;
+            font-size: 0.9rem;
+            margin-top: 0.2rem;
+            opacity: 0.8;
+        }
+        .login-card .logo-area .divider {
+            width: 60px;
+            border: 2px solid #2E86C1;
+            margin: 0.8rem auto 0;
+            border-radius: 4px;
+        }
+        .login-card .stTextInput > div > div > input {
+            border-radius: 16px !important;
+            border: 1px solid rgba(0,0,0,0.1) !important;
+            padding: 0.75rem 1.2rem !important;
+            font-size: 1rem !important;
+            background: rgba(255,255,255,0.7) !important;
+            transition: all 0.2s ease;
+        }
+        .login-card .stTextInput > div > div > input:focus {
+            border-color: #2E86C1 !important;
+            box-shadow: 0 0 0 4px rgba(46, 134, 193, 0.2) !important;
+            background: white !important;
+        }
+        .login-card .stButton button {
+            width: 100%;
+            background: #2E86C1 !important;
+            color: white !important;
+            font-weight: 600 !important;
+            padding: 0.75rem !important;
+            border-radius: 16px !important;
+            border: none !important;
+            font-size: 1.05rem !important;
+            transition: all 0.2s ease !important;
+            margin-top: 0.5rem;
+            box-shadow: 0 4px 12px rgba(46, 134, 193, 0.3);
+        }
+        .login-card .stButton button:hover {
+            background: #1a5276 !important;
+            box-shadow: 0 8px 28px rgba(46, 134, 193, 0.4);
+            transform: scale(1.02);
+        }
+        .login-card .error-msg {
+            color: #c0392b;
+            font-size: 0.9rem;
+            text-align: center;
+            margin-top: 0.8rem;
+            background: rgba(231, 76, 60, 0.1);
+            padding: 0.6rem 1rem;
+            border-radius: 12px;
+            border-left: 4px solid #e74c3c;
+            backdrop-filter: blur(4px);
+        }
+        /* Remove Streamlit default padding for the login page */
+        .main > div {
+            padding: 0 !important;
+        }
+        /* Ensure the login page uses full viewport */
+        .stApp {
+            background: transparent !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ---- Background elements ----
+    st.markdown('<div class="login-bg"></div><div class="login-overlay"></div>', unsafe_allow_html=True)
+
+    # ---- Login card ----
+    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
+    st.markdown('<div class="login-card">', unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="logo-area">
+        <h2>IM2 Dienstplan</h2>
+        <div class="subhead">hospital shift scheduling · beta</div>
+        <div class="divider"></div>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.container():
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        with st.form("login_form"):
-            city = st.text_input("Which city are you?")
-            submitted = st.form_submit_button("Log in")
-            if submitted:
-                if check_city(city):
-                    st.session_state["authenticated"] = True
-                    st.session_state["last_activity"] = datetime.now()
-                    st.rerun()
-                elif check_city(city) is None:
-                    st.error("Invalid city – please type it in english. without ‘ü’")
-                else:
-                    st.error("Invalid city – please try again")
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()  # Prevent any further rendering if not authenticated
+    with st.form("login_form"):
+        city = st.text_input("Which city are you?", placeholder="e.g. Tübingen")
+        submitted = st.form_submit_button("Log in")
+        if submitted:
+            if check_city(city):
+                st.session_state["authenticated"] = True
+                st.session_state["last_activity"] = datetime.now()
+                st.rerun()
+            elif check_city(city) is None:
+                st.markdown('<div class="error-msg">"Invalid city – please type it in english. without ‘ü’"</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="error-msg">"Invalid city – please try again"</div>', unsafe_allow_html=True)
+    st.markdown('</div></div>', unsafe_allow_html=True)  # close card and wrapper
+    st.stop()
 
 # --- Session state ---
 if 'initialized' not in st.session_state:

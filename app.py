@@ -244,54 +244,33 @@ st.markdown("""
 """, unsafe_allow_html=True) 
 
 
+
 # --- LOGIN PAGE (shown only if not authenticated) ---
 if not st.session_state["authenticated"]:
-    # ---- Background image and overlay ----
-    # st.markdown("""
-    # <style> 
-    #     /* Dark overlay to improve text readability */
-    #     .login-overlay {
-    #         position: fixed;
-    #         top: 0;
-    #         left: 0;
-    #         width: 100vw;
-    #         height: 100vh;
-    #         z-index: 1;
-    #         background: rgba(0, 0, 0, 0.45);
-    #         backdrop-filter: blur(2px);
-    #     } 
-    # </style>
-    # """, unsafe_allow_html=True)
-
-    # ---- Background elements ----
-    st.markdown('<div class="login-bg"></div><div class="login-overlay"></div>', unsafe_allow_html=True)
-
-    # ---- Login card ----
-    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
-    st.markdown('<div class="login-card">', unsafe_allow_html=True)
-
     st.markdown("""
-    <div class="logo-area">
-        <h2>IM2 Dienstplan</h2>
-        <div class="subhead">hospital shift scheduling · beta</div>
-        <div class="divider"></div>
+    <div style="text-align: center; margin-bottom: 1rem;">
+        <h3 style="color: #1a1a2e; font-weight: 300; font-size: 1.8rem; margin: 0.2rem 0;">IM2 Dienstplan</h3>
+        <hr style="width: 200px; border: 1px solid #2E86C1; margin: 0rem auto;">
+        <p style="color: #6c757d;">Please log in to continue</p>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.form("login_form"):
-        city = st.text_input("Which city are you?", placeholder="e.g. Munich")
-        submitted = st.form_submit_button("Log in")
-        if submitted:
-            if check_city(city):
-                st.session_state["authenticated"] = True
-                st.session_state["last_activity"] = datetime.now()
-                st.rerun()
-            elif check_city(city) is None:
-                st.markdown('<div class="error-msg">"Invalid city – please type it in english. without ‘ü’"</div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="error-msg">"Invalid city – please try again"</div>', unsafe_allow_html=True)
-    st.markdown('</div></div>', unsafe_allow_html=True)  # close card and wrapper
-    st.stop()
+    with st.container():
+        st.markdown('<div class="login-container">', unsafe_allow_html=True)
+        with st.form("login_form"):
+            city = st.text_input("Which city are you?", placeholder="e.g. Munich")
+            submitted = st.form_submit_button("Log in")
+            if submitted:
+                if check_city(city):
+                    st.session_state["authenticated"] = True
+                    st.session_state["last_activity"] = datetime.now()
+                    st.rerun()
+                elif check_city(city) is None:
+                    st.error("Invalid city – please type it in english. without ‘ü’")
+                else:
+                    st.error("Invalid city – please try again")
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()  # Prevent any further rendering if not authenticated
 
 # --- Session state ---
 if 'initialized' not in st.session_state:

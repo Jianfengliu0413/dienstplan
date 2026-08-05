@@ -437,6 +437,55 @@ with tab1:
     
     output_file = st.text_input("Output filename", "Stationsplan_out.xlsx")
 
+    # if st.button("Generate Schedule", use_container_width=True):
+    #     with st.spinner("Generating schedule..."):
+    #         try:
+    #             template_path = st.session_state.get('template_path')
+    #             if template_path is None or not os.path.exists(template_path):
+    #                 st.error("Please upload a valid Template file (Stationsplan) in the sidebar.")
+    #                 st.stop()
+                
+    #             rules_file_path = RULES_FILE
+    #             st.info(f"Reading your local Rules file...")
+
+    #             settings_df = current_config.get("Settings", pd.DataFrame()).copy()
+    #             settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
+    #             settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
+    #             if st.session_state.get('wishes_path'):
+    #                 settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = st.session_state['wishes_path']
+                
+    #             with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+    #                 settings_df.to_excel(writer, sheet_name="Settings", index=False)
+    #             # # After writing Settings sheet, but before run_scheduler:
+    #             # if os.path.exists(rules_file_path):
+    #             #     # Print the content of the Stations sheet for verification
+    #             #     try:
+    #             #         debug_config = load_config(rules_file_path)
+    #             #         stations_df = debug_config.get('Stations', pd.DataFrame())
+    #             #         # st.write("Stations sheet in the file being used:")
+    #             #         # st.dataframe(stations_df)
+    #             #     except Exception as e:
+    #             #         st.warning(f"Could not read Stations sheet for debug: {e}")
+
+
+    #             # st.subheader("Debug: Stations sheet in current_config")
+    #             # st.dataframe(current_config.get('Stations', pd.DataFrame()))
+    #             wishes = st.session_state.get('wishes_path')
+
+    #             # Use the current_config dict directly to avoid file I/O issues
+    #             success, log_output = run_scheduler(template_path, output_file, None, wishes, config_dict=current_config)
+    #             if success:
+    #                 st.success("Schedule generated successfully!")
+    #                 st.session_state['output_file'] = output_file
+    #                 st.session_state['log_output'] = log_output
+    #             else:
+    #                 st.error(f"Scheduler failed. Log:\n{log_output}")
+                
+    #         except Exception as e:
+    #             st.error(f"Error: {e}")
+    #             st.code(traceback.format_exc(), language="python")
+    # st.markdown('</div>', unsafe_allow_html=True)
+
     if st.button("Generate Schedule", use_container_width=True):
         with st.spinner("Generating schedule..."):
             try:
@@ -456,31 +505,28 @@ with tab1:
                 
                 with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
                     settings_df.to_excel(writer, sheet_name="Settings", index=False)
-                # # After writing Settings sheet, but before run_scheduler:
-                # if os.path.exists(rules_file_path):
-                #     # Print the content of the Stations sheet for verification
-                #     try:
-                #         debug_config = load_config(rules_file_path)
-                #         stations_df = debug_config.get('Stations', pd.DataFrame())
-                #         # st.write("Stations sheet in the file being used:")
-                #         # st.dataframe(stations_df)
-                #     except Exception as e:
-                #         st.warning(f"Could not read Stations sheet for debug: {e}")
 
-
-                # st.subheader("Debug: Stations sheet in current_config")
-                # st.dataframe(current_config.get('Stations', pd.DataFrame()))
                 wishes = st.session_state.get('wishes_path')
 
-                # Use the current_config dict directly to avoid file I/O issues
+                # Run the scheduler and capture the log
                 success, log_output = run_scheduler(template_path, output_file, None, wishes, config_dict=current_config)
+                
+                # Always store the log in session state
+                st.session_state['log_output'] = log_output
+
                 if success:
                     st.success("Schedule generated successfully!")
                     st.session_state['output_file'] = output_file
-                    st.session_state['log_output'] = log_output
                 else:
-                    st.error(f"Scheduler failed. Log:\n{log_output}")
-                
+                    st.error("Scheduler failed. See the log below for details.")
+
+                # --- Display the captured log ---
+                with st.expander("📋 Scheduler Log (full output)", expanded=True):
+                    if log_output:
+                        st.code(log_output, language="text")
+                    else:
+                        st.info("No log output captured.")
+
             except Exception as e:
                 st.error(f"Error: {e}")
                 st.code(traceback.format_exc(), language="python")

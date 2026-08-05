@@ -361,8 +361,8 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
         'Sprechstunde PP/Oberärzte': ('No', 'No'),
         'Springer/Konsile/Diagnostik': ('No', 'Yes'),
         '93 (3 IS)': ('No', 'Yes'),
-        'Rotation Med I': ('Yes', 'Yes'),
-        'Rotation': ('Yes', 'Yes'),
+        'Rotation Med I': ('No', 'No'),
+        'Rotation': ('No', 'No'),
         'Aufnahme': ('No', 'No'),
         'Forschung': ('No', 'Yes'),
         'Balingen': ('Yes', 'Yes'),
@@ -374,48 +374,121 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
         'Schwartz': ('No', 'No'),
     }
 
+    # # --- 9. Add doctors, handling duplicates (keep first occurrence) ---
+    # seen_doctors = set()
+    # # We'll attach overrides as attributes of the model
+    # model._active_override = {}
+    # model._weekend_override = {}
+    # model._inactive_doctors = {}   # store inactive doctors separately
+
+    # # Load the Doctors sheet from config once
+    # doctors_df = config.get('Doctors', pd.DataFrame())
+
+    # for row, name, fte, station in doctor_rows:
+    #     if name in seen_doctors:
+    #         continue
+    #     seen_doctors.add(name)
+
+    #     # Determine Active and Weekend
+    #     active_default = 'Yes'
+    #     weekend_default = 'Yes'
+
+    #     if name in special_doctor_defaults:
+    #         active_default, weekend_default = special_doctor_defaults[name]
+    #     elif station in station_defaults:
+    #         active_default, weekend_default = station_defaults[station]
+
+    #     # Store overrides for all doctors (for writing the sheet)
+    #     model._active_override[name] = active_default
+    #     model._weekend_override[name] = weekend_default
+        
+    #     # Read Allow92KMT and AllowNAZ from config
+    #     allow_92_kmt = False
+    #     allow_naz = False
+    #     if not doctors_df.empty:
+    #         doc_row = doctors_df[doctors_df['Name'] == name]
+    #         if not doc_row.empty:
+    #             if 'Allow92KMT' in doctors_df.columns:
+    #                 val = str(doc_row.iloc[0].get('Allow92KMT', 'No')).strip().upper()
+    #                 allow_92_kmt = val == 'YES'
+    #             if 'AllowNAZ' in doctors_df.columns:
+    #                 val = str(doc_row.iloc[0].get('AllowNAZ', 'No')).strip().upper()
+    #                 allow_naz = val == 'YES'
+
+    #     # Only add ACTIVE doctors to the model (they will be used by the solver)
+    #     if active_default == 'Yes':
+    #         doc = Doctor(
+    #             name=name,
+    #             fte=fte,
+    #             station=station,
+    #             weekend_available=(weekend_default == 'Yes'),
+    #             allow_92_kmt=allow_92_kmt,
+    #             allow_naz=allow_naz
+    #         )
+    #         model.doctors[name] = doc
+    #         model.doctor_row[name] = row
+    #     else:
+    #         # Store inactive for later writing (but not in model.doctors)
+    #         model._inactive_doctors[name] = {
+    #             'row': row,
+    #             'fte': fte,
+    #             'station': station,
+    #             'active': active_default,
+    #             'weekend': weekend_default
+    #         }
+    #         print(f"[Skipping inactive doctor]: {name} @ {station}")
+
     # --- 9. Add doctors, handling duplicates (keep first occurrence) ---
     seen_doctors = set()
-    # We'll attach overrides as attributes of the model
     model._active_override = {}
     model._weekend_override = {}
-    model._inactive_doctors = {}   # store inactive doctors separately
+    model._inactive_doctors = {}
 
-    # Load the Doctors sheet from config once
+    # Load the Doctors sheet from config once (already loaded)
     doctors_df = config.get('Doctors', pd.DataFrame())
+    # Create a lookup dict for fast access: name -> row (as Series)
+    doctor_lookup = {str(row['Name']).strip(): row for _, row in doctors_df.iterrows()} if not doctors_df.empty else {}
 
     for row, name, fte, station in doctor_rows:
         if name in seen_doctors:
             continue
         seen_doctors.add(name)
 
-        # Determine Active and Weekend
-        active_default = 'Yes'
-        weekend_default = 'Yes'
+        # ----- 1. Determine Active and Weekend from Doctors sheet if available -----
+        if name in doctor_lookup:
+            doc_row = doctor_lookup[name]
+            # Normalise values: "Yes"/"No" or True/False
+            active_val = str(doc_row.get('Active', 'Yes')).strip().upper()
+            weekend_val = str(doc_row.get('Weekend', 'Yes')).strip().upper()
+            # Map to 'Yes'/'No' (handle boolean-like)
+            active_default = 'Yes' if active_val in ('YES', 'TRUE', '1') else 'No'
+            weekend_default = 'Yes' if weekend_val in ('YES', 'TRUE', '1') else 'No'
+        else:
+            # Fallback to station_defaults or special overrides
+            active_default = 'Yes'
+            weekend_default = 'Yes'
+            if name in special_doctor_defaults:
+                active_default, weekend_default = special_doctor_defaults[name]
+            elif station in station_defaults:
+                active_default, weekend_default = station_defaults[station]
 
-        if name in special_doctor_defaults:
-            active_default, weekend_default = special_doctor_defaults[name]
-        elif station in station_defaults:
-            active_default, weekend_default = station_defaults[station]
-
-        # Store overrides for all doctors (for writing the sheet)
+        # Store overrides (for writing back to the config sheet later)
         model._active_override[name] = active_default
         model._weekend_override[name] = weekend_default
-        
-        # Read Allow92KMT and AllowNAZ from config
+
+        # ----- 2. Read Allow92KMT and AllowNAZ from Doctors sheet (if present) -----
         allow_92_kmt = False
         allow_naz = False
-        if not doctors_df.empty:
-            doc_row = doctors_df[doctors_df['Name'] == name]
-            if not doc_row.empty:
-                if 'Allow92KMT' in doctors_df.columns:
-                    val = str(doc_row.iloc[0].get('Allow92KMT', 'No')).strip().upper()
-                    allow_92_kmt = val == 'YES'
-                if 'AllowNAZ' in doctors_df.columns:
-                    val = str(doc_row.iloc[0].get('AllowNAZ', 'No')).strip().upper()
-                    allow_naz = val == 'YES'
+        if name in doctor_lookup:
+            doc_row = doctor_lookup[name]
+            if 'Allow92KMT' in doctors_df.columns:
+                val = str(doc_row.get('Allow92KMT', 'No')).strip().upper()
+                allow_92_kmt = val == 'YES'
+            if 'AllowNAZ' in doctors_df.columns:
+                val = str(doc_row.get('AllowNAZ', 'No')).strip().upper()
+                allow_naz = val == 'YES'
 
-        # Only add ACTIVE doctors to the model (they will be used by the solver)
+        # ----- 3. Add active doctors (skip inactive) -----
         if active_default == 'Yes':
             doc = Doctor(
                 name=name,
@@ -428,7 +501,6 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
             model.doctors[name] = doc
             model.doctor_row[name] = row
         else:
-            # Store inactive for later writing (but not in model.doctors)
             model._inactive_doctors[name] = {
                 'row': row,
                 'fte': fte,
@@ -436,8 +508,7 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                 'active': active_default,
                 'weekend': weekend_default
             }
-            print(f"[Skipping inactive doctor]: {name} @ {station}") 
-
+            print(f"[Skipping inactive doctor]: {name} @ {station}")
     # --- 10. Skills ---
     skills_cfg = config.get('Skills', pd.DataFrame())
     for _, row in skills_cfg.iterrows():

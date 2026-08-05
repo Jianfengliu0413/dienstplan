@@ -184,4 +184,23 @@ def add_soft_constraints(
                     model_cp.Add(consecutive >= x_vars[(i, j)] + x_vars[(prev_i, j)] - 1)
                     penalties.append(-zd_consecutive_reward * consecutive)
 
+    # 10. Penalize weekend duties if doctor is on vacation on adjacent Friday or Monday
+    adjacent_weekend_weight = int(penalties_cfg.get('BridgeDay', 0))
+    if adjacent_weekend_weight != 0:
+        for i, (day_idx, station, abbr) in enumerate(duties):
+            if not schedule.days[day_idx].is_weekend:
+                continue
+            weekday = schedule.days[day_idx].date.weekday()  # Monday=0, Sunday=6
+            for j, doc_name in enumerate(doctors):
+                # Check if doctor has vacation on adjacent day
+                vacation_adjacent = False
+                if weekday == 5:  # Saturday -> check Friday (day_idx-1)
+                    if day_idx > 0 and (doc_name, day_idx - 1) in schedule.unavailable:
+                        vacation_adjacent = True
+                elif weekday == 6:  # Sunday -> check Monday (day_idx+1)
+                    if day_idx < len(schedule.days) - 1 and (doc_name, day_idx + 1) in schedule.unavailable:
+                        vacation_adjacent = True
+                if vacation_adjacent:
+                    penalties.append(adjacent_weekend_weight * x_vars[(i, j)])
+
     return penalties

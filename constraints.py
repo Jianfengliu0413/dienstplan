@@ -291,3 +291,14 @@ def add_hard_constraints(
             sd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'SD']
             if sd_indices:
                 model_cp.Add(sum(x_vars[(i, j)] for i in sd_indices) <= max_sd_per_doctor)
+    # 18. No weekend duty if bridge day
+    if constraints_cfg.get('BridgeDay', 'No') == 'Yes':
+        for i, (day_idx, station, abbr) in enumerate(duties):
+            if not schedule.days[day_idx].is_weekend:
+                continue
+            weekday = schedule.days[day_idx].date.weekday()
+            for j, doc_name in enumerate(doctors):
+                if weekday == 5 and (doc_name, day_idx - 1) in schedule.unavailable:
+                    model_cp.Add(x_vars[(i, j)] == 0)
+                elif weekday == 6 and (doc_name, day_idx + 1) in schedule.unavailable:
+                    model_cp.Add(x_vars[(i, j)] == 0)

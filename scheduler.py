@@ -83,9 +83,18 @@ def create_default_config(config_path: str):
         preferences.to_excel(writer, sheet_name='Preferences', index=False)
 
         # Penalties
-        penalties = pd.DataFrame({
-            'Penalty': ['Preference', 'WorkloadBalance', 'WeekendBalance'],
-            'Weight': [10, 20, 15]
+        penalties = pd.DataFrame({"Penalty":['Preference',
+                                'WorkloadBalance',
+                                'WeekendBalance',
+                                'WeekendPairingReward',
+                                'WeekendSinglePenalty',
+                                'WeekendHomeStationBonus',
+                                'KMBalance',
+                                'CrossStation',
+                                'DayOffPenalty',
+                                'SDBalance',
+                                'ZDConsecutiveReward',
+                                'BridgeDay'], 'Weight': [10, 300, 50,30,20,10,30,50,60,150,50,50]
         })
         penalties.to_excel(writer, sheet_name='Penalties', index=False)
 
@@ -102,6 +111,8 @@ def create_default_config(config_path: str):
             'Value': ['Yes', 'Yes', 'Yes']
         })
         output.to_excel(writer, sheet_name='OutputOptions', index=False)
+
+
 def get_default_station_code_map() -> pd.DataFrame:
     data = [
         ("1", "65 PP"),
@@ -243,7 +254,20 @@ def write_missing_config_sheets(model: ScheduleModel, config_path: str):
         # Other required sheets (if missing)
         required_sheets = {
             'GeneralRules': pd.DataFrame({'RuleName': ['MaxConsecutiveWorkDays', 'MaxDutiesPerWeek'], 'Value': [6, 5]}),
-            'Penalties': pd.DataFrame({'Penalty': ['Preference', 'WorkloadBalance', 'WeekendBalance', 'CrossStation'], 'Weight': [10, 100, 15, 30]}),
+            'Penalties': pd.DataFrame({'Penalty': [
+                                                'Preference',
+                                                'WorkloadBalance',
+                                                'WeekendBalance',
+                                                'WeekendPairingReward',
+                                                'WeekendSinglePenalty',
+                                                'WeekendHomeStationBonus',
+                                                'KMBalance',
+                                                'CrossStation',
+                                                'DayOffPenalty',
+                                                'SDBalance',
+                                                'ZDConsecutiveReward',
+                                                'BridgeDay',], 
+                                       'Weight': [10, 300, 50,30,20,10,30,50,60,150,50,50]}),
             'Constraints': pd.DataFrame({'Constraint': ['MaxConsecutive', 'MaxPerWeek', 'WeekendOnly', 'SeniorRequired', 'WeekendAvailability', 'WeekendOnlyFullTime', 'WeekendOnlyForSkilled', 'MaxOneWeekendPerDoctor'], 'Enabled': ['Yes', 'Yes', 'No', 'Yes', 'Yes', 'Yes', 'Yes', 'No']}),
             'Preferences': pd.DataFrame(columns=['Doctor', 'Day', 'DutyType', 'Priority']),
             'OutputOptions': pd.DataFrame({'Option': ['IncludeStatistics', 'IncludeConflictReport', 'IncludeExplanation'], 'Value': ['Yes', 'Yes', 'Yes']})
@@ -397,8 +421,8 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
     schedule = parse_template(template_file, config, wishes_path=wishes_file)
 
     # # Always write detected doctors and stations back to Rules.xlsx
-    write_missing_config_sheets(schedule, config_path)
-    write_skills_auto(schedule, config_path)
+    # write_missing_config_sheets(schedule, config_path)
+    # write_skills_auto(schedule, config_path)
     print("Doctors and Stations sheets updated from template.")
 
     # Reload config: to pick up the newly written sheets
@@ -442,8 +466,8 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
         if (missing_skills or missing_demand) and not other_errors:
             # print("Configuration incomplete: missing skills and/or station duty counts.")
             # print("Generating missing sheets with detected doctors and stations...")
-            write_missing_config_sheets(schedule, config_path)
-            write_skills_auto(schedule, config_path)
+            # write_missing_config_sheets(schedule, config_path)
+            # write_skills_auto(schedule, config_path)
             # print("\nPlease open Rules.xlsx and fill in:")
             # print("  - Skills sheet: assign each doctor their duty types (SD, ZD, KM, etc.)")
             # print("  - Stations sheet: add DutyCounts (e.g., 'SD=2, ZD=1, KM=1')")

@@ -202,5 +202,13 @@ def add_soft_constraints(
                         vacation_adjacent = True
                 if vacation_adjacent:
                     penalties.append(adjacent_weekend_weight * x_vars[(i, j)])
-
+    # 11. Bonus for main‑station doctors on weekend PR (reward)
+    main_station_bonus = int(penalties_cfg.get('MainStationWeekendBonus', 0))
+    if main_station_bonus != 0:
+        for i, (day_idx, station, abbr) in enumerate(duties):
+            if abbr == 'PR' and schedule.days[day_idx].is_weekend:
+                for j, doc_name in enumerate(doctors):
+                    if schedule.doctors[doc_name].station in MAIN_STATIONS:
+                        penalties.append(-main_station_bonus * x_vars[(i, j)])
+                        
     return penalties

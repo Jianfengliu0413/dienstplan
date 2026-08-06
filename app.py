@@ -507,7 +507,11 @@ with tab1:
                     settings_df.to_excel(writer, sheet_name="Settings", index=False)
 
                 wishes = st.session_state.get('wishes_path')
-
+                if 'SpecialWeekendDays' in current_config:
+                    df = current_config['SpecialWeekendDays'].copy()
+                    if 'Date' in df.columns:
+                        df['Date'] = pd.to_datetime(df['Date']).dt.date.astype(str)
+                    current_config['SpecialWeekendDays'] = df
                 # Run the scheduler and capture the log
                 success, log_output = run_scheduler(template_path, output_file, None, wishes, config_dict=current_config)
                 

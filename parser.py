@@ -104,7 +104,7 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
     else:
         base_month = 10
         base_year = 2026
-    print(f"Using base month={base_month}, year={base_year}")
+    print(f"month detected: {base_month}.{base_year}")
 
     # Parse date headers
     days = []
@@ -828,7 +828,7 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
 
             if is_fixed:
                 model.unavailable.add((doc_name, day_idx))
-                print(f"[UNAVAILABLE]: {doc_name} on {model.days[day_idx].date} (fixed value)")
+                print(f"[unavailable]: {doc_name} on {model.days[day_idx].date} (fixed value)")
                 continue
 
             # ---------- 3. Check station code ----------
@@ -839,13 +839,13 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
                     duty_abbr = 'PR'
                     if station in ['65 PP', '85 Häm/Onk/Rheu', '92 KMT', '65 LAF']:
                         model.fixed_assignments.append((doc_name, day_idx, station, duty_abbr))
-                        print(f"[FIXED] (station): {doc_name} must work {duty_abbr} at {station} on {model.days[day_idx].date}")
+                        print(f"[fixed] (station): {doc_name} want a {duty_abbr} duty on Station {station} on {model.days[day_idx].date}")
                         model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
                         continue
                 else:
                     duty_abbr = 'ZD'
                 model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 50))
-                print(f"[WISH] (station): {doc_name} wants {duty_abbr} at {station} on {model.days[day_idx].date} (priority 50)")
+                print(f"[WISH] (station): {doc_name} wants {duty_abbr} at {station} on {model.days[day_idx].date}")
             else:
                 # Ignore anything else
                 print(f"[Ignored]: {doc_name} on {model.days[day_idx].date} has value '{val_str}'")

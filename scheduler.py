@@ -408,7 +408,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
             print(f"Created default config at {config_path}")
             return None
         config = load_config(config_path)
-        print(f"[DEBUG] Config loaded from {config_path}")
+        print(f"[info] Config loaded...")
     # config_path = 'Rules.xlsx'
     if not os.path.exists(config_path):
         create_default_config(config_path)
@@ -433,7 +433,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
 
     # Reload config: to pick up the newly written sheets
     config = load_config(config_path)   # now the Doctors sheet reflects the template
-    print(f"[DEBUG] Config loaded from: {config_path}")
+    print(f"[INFO] Config loaded...")
     # Update schedule's duty_types from the reloaded config
     duty_cfg = config.get('DutyTypes', pd.DataFrame())
     if not duty_cfg.empty:

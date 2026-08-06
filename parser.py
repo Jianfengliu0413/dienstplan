@@ -849,3 +849,31 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
             else:
                 # Ignore anything else
                 print(f"[Ignored]: {doc_name} on {model.days[day_idx].date} has value '{val_str}'")
+
+    # ----- Parse NAZ demand rows (e.g., "NAZ-Dienst(NAZ)", "Lewetag (IM8)") -----
+    naz_demand_days = set()
+    for row in range(1, ws.max_row + 1):
+        cell_a = ws.cell(row=row, column=1)
+        cell_b = ws.cell(row=row, column=2) if ws.max_column >= 2 else None
+        val_a = cell_a.value if cell_a else ''
+        val_b = cell_b.value if cell_b else ''
+        if val_a is None: val_a = ''
+        if val_b is None: val_b = ''
+        # Skip if this row is already a doctor row (avoid double counting)
+        if row in wish_rows.values():
+            continue
+        # Look for 'NAZ' in column A or B (case‑insensitive)
+        if 'NAZ' in str(val_a).upper() or 'NAZ' in str(val_b).upper():
+            # Scan all date columns
+            for col, day_idx in day_cols_wish.items():
+                cell = ws.cell(row=row, column=col)
+                val = cell.value
+                if val is None:
+                    continue
+                norm_val = str(val).strip().upper()
+                if norm_val == 'NAZ':
+                    naz_demand_days.add(day_idx)
+                    print(f"[NAZ demand] day {day_idx} ({model.days[day_idx].date}) from wishes row {row}")
+
+    # Store in model for later use in demand builder
+    model.naz_demand_days = naz_demand_days

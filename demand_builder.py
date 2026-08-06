@@ -132,7 +132,16 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
                 demand[(day_idx, station)][duty_abbr] = max(demand[(day_idx, station)].get(duty_abbr, 0), 1)
             else:
                 print(f"[Warning]: Cannot add fixed assignment for {duty_abbr} at {station} – duty or station unknown.")
- 
+
+    # --- Add NAZ demand from wishes file (rows with "NAZ" in column A/B) ---
+    if hasattr(model, 'naz_demand_days'):
+        for day_idx in model.naz_demand_days:
+            # Add one NAZ duty at Global station for that day
+            demand[(day_idx, GLOBAL_STATION)]['NAZ'] = max(
+                demand[(day_idx, GLOBAL_STATION)].get('NAZ', 0), 1
+            )
+            print(f"[Demand] Added NAZ on {model.days[day_idx].date} from wishes")
+
     # 4. SUBSTITUTION LOGIC
     demand = add_substitute_demand(model, demand)
 

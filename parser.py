@@ -154,7 +154,45 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
         raise ValueError("No valid date headers found in row 1.")
 
     print(f"Parsed {len(days)} days, first date: {days[0].date.strftime('%Y-%m-%d')}")
-    
+
+    # --- Read SpecialWeekendDays sheet (if present) ---
+    special_days_df = config.get('SpecialWeekendDays', pd.DataFrame())
+    if not special_days_df.empty:
+        # Assume column 'Date' contains dates as strings or Excel dates
+        for _, row in special_days_df.iterrows():
+            date_val = row['Date']
+            if pd.isna(date_val):
+                continue
+            # Try to parse date
+            parsed_date = None
+            if isinstance(date_val, (datetime, pd.Timestamp)):
+                parsed_date = date_val if isinstance(date_val, datetime) else date_val.to_pydatetime()
+            elif isinstance(date_val, str):
+                # Try common formats
+                for fmt in ('%Y-%m-%d', '%d.%m.%Y', '%m/%d/%Y'):
+                    try:
+                        parsed_date = datetime.strptime(date_val, fmt)
+                        break
+                    except ValueError:
+                        continue
+            elif isinstance(date_val, (int, float)):
+                # Excel serial date (assuming 1900 system)
+                try:
+                    parsed_date = datetime.fromordinal(datetime(1900, 1, 1).toordinal() + int(date_val) - 2)
+                except:
+                    continue
+            if parsed_date:
+                # Find matching day in days list
+                matched = False
+                for day in days:
+                    if day.date.year == parsed_date.year and day.date.month == parsed_date.month and day.date.day == parsed_date.day:
+                        day.is_weekend = True
+                        matched = True
+                        print(f"[Special] {day.date.strftime('%Y-%m-%d')} marked as weekend (holiday)")
+                        break
+                if not matched:
+                    print(f"[Warning] Special date {parsed_date.strftime('%Y-%m-%d')} not in current month – ignored.")
+                    
     # --- 2. Create the model and set basic attributes ---
     model = ScheduleModel()
     model.days = days

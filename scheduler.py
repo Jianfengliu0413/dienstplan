@@ -31,7 +31,12 @@ def create_default_config(config_path: str):
                       'Plan', 'B2', '', 'A', 'B', 'x, F, X, U, u, dgho, NAZ, 65P, 92.0, 85.0', '0', '00FF00']
         })
         settings.to_excel(writer, sheet_name='Settings', index=False)
-
+        #for special weekend days (holidays)
+        special_days = pd.DataFrame({
+            'Date': ['2026-12-24', '2026-12-25', '2026-12-31'],  # example
+            'Description': ['Christmas Eve', 'Christmas Day', 'New Year\'s Eve']
+        })
+        special_days.to_excel(writer, sheet_name='SpecialWeekendDays', index=False)
         # Doctors (sample – you will overwrite this later) 
         doctors = pd.DataFrame({
             'Name': ['Dr. Müller', 'Dr. Schmidt', 'Dr. Weber', 'Dr. Fischer'],
@@ -270,6 +275,7 @@ def write_missing_config_sheets(model: ScheduleModel, config_path: str):
                                        'Weight': [10, 300, 50,30,20,10,30,50,60,150,50,50]}),
             'Constraints': pd.DataFrame({'Constraint': ['MaxConsecutive', 'MaxPerWeek', 'WeekendOnly', 'SeniorRequired', 'WeekendAvailability', 'WeekendOnlyFullTime', 'WeekendOnlyForSkilled', 'MaxOneWeekendPerDoctor'], 'Enabled': ['Yes', 'Yes', 'No', 'Yes', 'Yes', 'Yes', 'Yes', 'No']}),
             'Preferences': pd.DataFrame(columns=['Doctor', 'Day', 'DutyType', 'Priority']),
+            'SpecialWeekendDays': pd.DataFrame(columns=['Date', 'Description']),
             'OutputOptions': pd.DataFrame({'Option': ['IncludeStatistics', 'IncludeConflictReport', 'IncludeExplanation'], 'Value': ['Yes', 'Yes', 'Yes']})
         }
         for sheet_name, df_template in required_sheets.items():

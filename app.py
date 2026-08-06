@@ -521,7 +521,7 @@ with tab1:
                     st.error("Scheduler failed. See the log below for details.")
 
                 # --- Display the captured log ---
-                with st.expander("📋 Scheduler Log (full output)", expanded=True):
+                with st.expander("log", expanded=True):
                     if log_output:
                         st.code(log_output, language="text")
                     else:

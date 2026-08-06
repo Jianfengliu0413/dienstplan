@@ -6,7 +6,7 @@ import pandas as pd
 from collections import defaultdict
 
 from typing import List, Tuple, Dict
-from demand_builder import GLOBAL_STATION
+from demand_builder import MAIN_STATIONS
 
 def add_soft_constraints(
     model_cp: cp_model.CpModel,

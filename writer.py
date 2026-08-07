@@ -216,8 +216,13 @@ def mark_compensatory_days(
         pr = counts[doc]['PR']
         hd = counts[doc]['HD']
         naz = counts[doc]['NAZ']
-        comp_needed[doc] = (pr + 1) // 2 + hd + naz
-
+        base = pr // 2 + hd + naz
+        # If pr is odd and the base is > 0, we have a .5 that needs rounding up
+        if pr % 2 == 1 and base > 0:
+            comp = base + 1
+        else:
+            comp = base
+        comp_needed[doc] = comp
     # 3. Build busy_on_day (doctors already working that day)
     busy_on_day = defaultdict(set)
     for i, doc_name in assignment.items():

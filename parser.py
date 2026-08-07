@@ -11,14 +11,29 @@ import pandas as pd
 from models import ScheduleModel, Doctor, Day, DutyType, Station
 from demand_builder import GLOBAL_DUTIES, GLOBAL_STATION, MAIN_STATIONS
 import shlex
+# def parse_excluded_list(s: str) -> set:
+#     if not s:
+#         return set()
+#     try:
+#         return {item.strip() for item in shlex.split(s)}
+#     except ValueError:
+#         # fallback to simple comma split if shlex fails
+#         return {item.strip() for item in s.split(',') if item.strip()}
+
+import csv
+import io
+
 def parse_excluded_list(s: str) -> set:
+    """Parse a comma‑separated list, handling quoted fields with commas."""
     if not s:
         return set()
+    # Use csv.reader to handle quoted fields and whitespace
+    reader = csv.reader(io.StringIO(s), skipinitialspace=True)
     try:
-        return {item.strip() for item in shlex.split(s)}
-    except ValueError:
-        # fallback to simple comma split if shlex fails
-        return {item.strip() for item in s.split(',') if item.strip()}
+        items = next(reader)
+    except StopIteration:
+        return set()
+    return {item.strip() for item in items if item.strip()}
 def is_dark_green(rgb_hex: str, tolerance: int = 10) -> bool:
     """Dark green: G > R and G > B with low brightness."""
     if len(rgb_hex) == 8:
@@ -83,6 +98,8 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
     excluded_stations_str = settings.get('ExcludedStations', '')
     excluded_doctors = parse_excluded_list(excluded_doctors_str)
     excluded_stations = parse_excluded_list(excluded_stations_str)
+    print(f"DEBUG excluded_doctors: {excluded_doctors}")
+    print(f"DEBUG excluded_stations: {excluded_stations}")
     # --- 1. Parse month and dates ---
     month_cell = ws.cell(row=1, column=1)
     month_val = month_cell.value
@@ -211,6 +228,8 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
     model.days = days
     model.day_col = day_cols
     model.sheet_name = sheet_name
+    model.excluded_doctors = excluded_doctors
+    model.excluded_stations = excluded_stations
 
     # Spätdienst IMA row
     ima_sd_days = set()
@@ -688,10 +707,35 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
     print(f"[DONE!!!]: Parsing complete: found {len(model.doctors)} doctors and {len(model.stations)} stations.")
     return model
 
+# def ensure_doctor_active(doc_name: str, model: ScheduleModel) -> bool:
+#     """如果医生在 _inactive_doctors 中且有固定任务需求，则重新激活他，但排除名单中的医生除外。"""
+#     if doc_name in model.doctors:
+#         return True
+#     # Check if doctor is in excluded list
+#     if hasattr(model, 'excluded_doctors') and doc_name in model.excluded_doctors:
+#         return False
+#     if hasattr(model, '_inactive_doctors') and doc_name in model._inactive_doctors:
+#         info = model._inactive_doctors[doc_name]
+#         doc = Doctor(
+#             name=doc_name,
+#             fte=info['fte'],
+#             station=info['station'],
+#             weekend_available=(info['weekend'] == 'Yes'),
+#             allow_92_kmt=info.get('allow_92_kmt', False),
+#             allow_naz=info.get('allow_naz', False),
+#             category=info.get('category', 'other')
+#         )
+#         model.doctors[doc_name] = doc
+#         model.doctor_row[doc_name] = info['row']
+#         del model._inactive_doctors[doc_name]
+#         print(f"[REACTIVATED] {doc_name} due to fixed wish.")
+#         return True
+#     return False
 def ensure_doctor_active(doc_name: str, model: ScheduleModel) -> bool:
-    """如果医生在 _inactive_doctors 中且有固定任务需求，则重新激活他。"""
+    """Reactivate inactive doctor if they have a fixed wish, even if excluded."""
     if doc_name in model.doctors:
         return True
+    # Check if doctor is in inactive list (including excluded ones)
     if hasattr(model, '_inactive_doctors') and doc_name in model._inactive_doctors:
         info = model._inactive_doctors[doc_name]
         doc = Doctor(
@@ -705,12 +749,15 @@ def ensure_doctor_active(doc_name: str, model: ScheduleModel) -> bool:
         )
         model.doctors[doc_name] = doc
         model.doctor_row[doc_name] = info['row']
-        # 从 inactive 列表中移除，防止重复激活
+        # Mark as limited to fixed assignments if they were excluded
+        if hasattr(model, 'excluded_doctors') and doc_name in model.excluded_doctors:
+            doc._limited_to_fixed = True   # add this attribute
+            print(f"[REACTIVATED] {doc_name} (excluded but has wish, limited to fixed duties)")
+        else:
+            print(f"[REACTIVATED] {doc_name} due to fixed wish.")
         del model._inactive_doctors[doc_name]
-        print(f"[REACTIVATED] {doc_name} due to fixed wish.")
         return True
     return False
-
 def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict, fixed_vals: set, vacation_color: str):
     """
     从愿望文件读取所有条目，**全部强制转为固定任务**，忽略：
@@ -812,7 +859,9 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
             ensure_doctor_active(doc_name, model)
             if doc_name not in model.doctors:
                 continue
-
+            # if doc_name in model.excluded_doctors:
+            #     print(f"[SKIP] {doc_name} is excluded, ignoring wish")
+            #     continue
             # ----- 1. 检查是否为职责缩写 -----
             if norm_upper in duty_abbrs:
                 duty_abbr = norm_upper

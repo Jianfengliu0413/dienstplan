@@ -394,7 +394,22 @@ def add_hard_constraints(
                 ]
                 if weekend_indices:
                     model_cp.Add(sum(x_vars[(i, j)] for i in weekend_indices) <= max_main_weekend)
-
+    # 20. Limited doctors can only take their fixed duties
+    limited_doctors = [j for j, doc_name in enumerate(doctors) if getattr(schedule.doctors[doc_name], '_limited_to_fixed', False)]
+    for j in limited_doctors:
+        # They can only be assigned to duties that are fixed for them
+        # We need to identify which duties are fixed for this doctor
+        fixed_duties_for_this_doctor = []
+        for doc_name, day_idx, station, abbr in schedule.fixed_assignments:
+            if doc_name == doctors[j]:
+                # Get the duty index
+                key = (day_idx, station, abbr)
+                if key in duty_map:
+                    fixed_duties_for_this_doctor.append(duty_map[key])
+        # Allow only those duties
+        for i in range(num_duties):
+            if i not in fixed_duties_for_this_doctor:
+                model_cp.Add(x_vars[(i, j)] == 0)
 def get_allowed_doctors_for_weekend_pr(day_idx, station, doctors, schedule):
     """
     Return list of doctor indices in priority order:

@@ -192,12 +192,13 @@ def mark_compensatory_days(
     """
     After all assignments are written, mark compensatory days (light green)
     for doctors based on weekend PR (2 PR = 1 day), HD (1 day each), NAZ (1 day each).
-    Avoid having more than one doctor from the same station taking comp on the same day.
+    Avoid having more than one doctor from the same station taking comp on the same day,
+    and prefer days where the station already has good coverage (fewer vacations/absences).
     """
     from openpyxl.styles import PatternFill
-    from collections import defaultdict 
+    from collections import defaultdict
 
-    # 1. 统计每个医生的周末 PR、HD、NAZ 数量
+    # 1. Count weekend PR, HD, NAZ per doctor
     counts = {doc: {'PR': 0, 'HD': 0, 'NAZ': 0} for doc in doctors}
     for i, doc_name in assignment.items():
         day_idx, station, abbr = duties[i]
@@ -209,21 +210,21 @@ def mark_compensatory_days(
             elif abbr == 'NAZ':
                 counts[doc_name]['NAZ'] += 1
 
-    # 2. 计算应得补偿天数
+    # 2. Compute comp needed (round up for PR: 3 PR -> 2 days)
     comp_needed = {}
     for doc in doctors:
         pr = counts[doc]['PR']
         hd = counts[doc]['HD']
         naz = counts[doc]['NAZ']
-        # comp_needed[doc] = (pr // 2) + hd + naz
-        comp_needed[doc] = (pr + 1) // 2 + hd + naz #  round up (e.g., 3 PR → 2 days)
+        comp_needed[doc] = (pr + 1) // 2 + hd + naz
 
-    # 3. 构建可用工作日（医生当天无任务、非 unavailable）
+    # 3. Build busy_on_day (doctors already working that day)
     busy_on_day = defaultdict(set)
     for i, doc_name in assignment.items():
         day_idx, _, _ = duties[i]
         busy_on_day[day_idx].add(doc_name)
 
+    # 4. For each doctor, find available weekdays (no duty, not unavailable)
     available = {doc: [] for doc in doctors}
     for day_idx, day in enumerate(schedule.days):
         if day.is_weekend:
@@ -235,38 +236,54 @@ def mark_compensatory_days(
                 continue
             available[doc].append(day_idx)
 
-    # 4. 按站分组医生（排除无 station 的医生，他们单独处理）
+    # 5. Group doctors by station
     station_doctors = defaultdict(list)
     for doc in doctors:
         station = schedule.doctors[doc].station
         if station is not None:
             station_doctors[station].append(doc)
 
-    # 5. 对每个站分别进行补偿日分配
-    # 记录每个站每天已分配补偿的人数
+    # 6. Track how many comps already assigned per station per day (max 1 per station per day)
     station_comp_count = defaultdict(lambda: defaultdict(int))
 
+    # 7. For each station, process doctors with comp needs
     for station, doc_list in station_doctors.items():
-        # 只处理有补偿需求的医生
         docs_needing = [doc for doc in doc_list if comp_needed.get(doc, 0) > 0]
-        # 按需要的天数降序排列（需求多的优先分配）
+        # Sort by need descending (more needy first)
         docs_needing.sort(key=lambda d: comp_needed[d], reverse=True)
 
         for doc in docs_needing:
             needed = comp_needed[doc]
             if needed <= 0:
                 continue
-            # 该医生可用的工作日
             avail_days = available.get(doc, [])
             if not avail_days:
                 continue
 
-            # 按当天该站已补偿人数升序排序（优先选人数少的日子）
-            avail_days.sort(key=lambda d: station_comp_count[station][d])
-            # 选择前 needed 天（若不足则全选）
-            selected = avail_days[:needed]
-            for day_idx in selected:
-                # 标记补偿日
+            # Score each available day: prefer days where the station has the most available doctors
+            scored_days = []
+            for day_idx in avail_days:
+                # Count how many doctors from this station are available (not working, not on vacation)
+                station_available = 0
+                for other_doc in doc_list:
+                    if other_doc == doc:
+                        continue
+                    if other_doc in busy_on_day[day_idx]:
+                        continue
+                    if (other_doc, day_idx) in schedule.unavailable:
+                        continue
+                    station_available += 1
+                # Penalize days where this station already has a comp assigned
+                existing_comp = station_comp_count[station][day_idx]
+                score = station_available - existing_comp * 10  # strong penalty for duplicate comp
+                scored_days.append((day_idx, score))
+
+            # Sort by score descending (best coverage first), then by day index
+            scored_days.sort(key=lambda x: (-x[1], x[0]))
+            selected_days = [day_idx for day_idx, _ in scored_days[:needed]]
+
+            # Assign comp days
+            for day_idx in selected_days:
                 row = schedule.doctor_row.get(doc)
                 if row is None:
                     continue
@@ -276,10 +293,9 @@ def mark_compensatory_days(
                 cell = ws.cell(row=row, column=col)
                 if cell.value is None and (row, col) not in schedule.fixed_cells:
                     cell.fill = LIGHT_GREEN_FILL
-                    # 记录该站该天已分配一个补偿
                     station_comp_count[station][day_idx] += 1
 
-    # 6. 处理无 station 的医生（如无，忽略）
+    # 8. Handle doctors without a station (fallback: just take first available days)
     for doc in doctors:
         if schedule.doctors[doc].station is None:
             needed = comp_needed.get(doc, 0)
@@ -288,7 +304,6 @@ def mark_compensatory_days(
             avail_days = available.get(doc, [])
             if not avail_days:
                 continue
-            # 不参与站内平衡，直接取前 needed 天
             selected = avail_days[:needed]
             for day_idx in selected:
                 row = schedule.doctor_row.get(doc)
@@ -300,7 +315,6 @@ def mark_compensatory_days(
                 cell = ws.cell(row=row, column=col)
                 if cell.value is None and (row, col) not in schedule.fixed_cells:
                     cell.fill = LIGHT_GREEN_FILL
- 
 
 def add_compensatory_sd(
     ws,

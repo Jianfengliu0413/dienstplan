@@ -607,8 +607,8 @@ def auto_relax_and_solve(schedule, config, duties, doctors, demand, duty_hours, 
 
     # ---- Stage 12‑13: increase general caps if still needed ----
     caps_seq2 = [
-        (8, 3, 10, 10, 2),
-        (9, 3, 10, 10, 2),
+        (8, 4, 10, 10, 2),
+        (9, 4, 10, 10, 2),
     ]
     for i, (w, pr, cons, week, main) in enumerate(caps_seq2, start=12):
         stages.append({

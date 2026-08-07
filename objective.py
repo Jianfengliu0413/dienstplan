@@ -246,4 +246,19 @@ def add_soft_constraints(
                 for j, doc_name in enumerate(doctors):
                     if not schedule.doctors[doc_name].allow_92_kmt:
                         penalties.append(penalty_92_kmt * x_vars[(i, j)])
+    # 14. PR balance (weekend PR duties only)
+    pr_balance_weight = int(penalties_cfg.get('PRBalance', 0))
+    if pr_balance_weight != 0:
+        pr_indices = [i for i, (day_idx, station, abbr) in enumerate(duties)
+                      if abbr == 'PR' and schedule.days[day_idx].is_weekend]
+        if pr_indices:
+            avg_pr = len(pr_indices) / num_doctors if num_doctors > 0 else 0
+            for j in range(num_doctors):
+                pr_assigned = model_cp.NewIntVar(0, len(pr_indices), f'pr_{j}')
+                model_cp.Add(pr_assigned == sum(x_vars[(i, j)] for i in pr_indices))
+                pos_dev = model_cp.NewIntVar(0, len(pr_indices), f'pr_pos_{j}')
+                neg_dev = model_cp.NewIntVar(0, len(pr_indices), f'pr_neg_{j}')
+                model_cp.Add(pr_assigned - int(avg_pr) == pos_dev - neg_dev)
+                penalties.append(pr_balance_weight * pos_dev)
+                penalties.append(pr_balance_weight * neg_dev)
     return penalties

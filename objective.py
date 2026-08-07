@@ -211,5 +211,39 @@ def add_soft_constraints(
                 for j, doc_name in enumerate(doctors):
                     if schedule.doctors[doc_name].station in MAIN_STATIONS:
                         penalties.append(-main_station_bonus * x_vars[(i, j)])
-                        
+
+    # # 12. Category reward for weekend PR (main > jumper > other)
+    # category_reward_main = int(penalties_cfg.get('CategoryRewardMain', 30))
+    # category_reward_jumper = int(penalties_cfg.get('CategoryRewardJumper', 10))
+    # if category_reward_main or category_reward_jumper:
+    #     for i, (day_idx, station, abbr) in enumerate(duties):
+    #         if abbr == 'PR' and schedule.days[day_idx].is_weekend:
+    #             for j, doc_name in enumerate(doctors):
+    #                 cat = schedule.doctors[doc_name].category
+    #                 if cat == 'main':
+    #                     penalties.append(-category_reward_main * x_vars[(i, j)])
+    #                 elif cat == 'jumper':
+    #                     penalties.append(-category_reward_jumper * x_vars[(i, j)])
+    
+    # 12. Category rewards for weekend duties
+    main_reward = int(penalties_cfg.get('MainCategoryReward', 30))
+    jumper_reward = int(penalties_cfg.get('JumperCategoryReward', 10))
+    if main_reward or jumper_reward:
+        for i, (day_idx, station, abbr) in enumerate(duties):
+            if schedule.days[day_idx].is_weekend and abbr in ['PR', 'HD', 'NAZ']:
+                for j, doc_name in enumerate(doctors):
+                    cat = schedule.doctors[doc_name].category
+                    if cat == 'main':
+                        penalties.append(-main_reward * x_vars[(i, j)])
+                    elif cat == 'jumper':
+                        penalties.append(-jumper_reward * x_vars[(i, j)])
+
+    # 13. Penalty for 92 KMT PR without allow_92_kmt
+    penalty_92_kmt = int(penalties_cfg.get('Penalty92KMT', 100))
+    if penalty_92_kmt:
+        for i, (day_idx, station, abbr) in enumerate(duties):
+            if station == '92 KMT' and abbr == 'PR' and schedule.days[day_idx].is_weekend:
+                for j, doc_name in enumerate(doctors):
+                    if not schedule.doctors[doc_name].allow_92_kmt:
+                        penalties.append(penalty_92_kmt * x_vars[(i, j)])
     return penalties

@@ -9,8 +9,16 @@ import re
 import os
 import pandas as pd
 from models import ScheduleModel, Doctor, Day, DutyType, Station
-from demand_builder import GLOBAL_DUTIES, GLOBAL_STATION
-
+from demand_builder import GLOBAL_DUTIES, GLOBAL_STATION, MAIN_STATIONS
+import shlex
+def parse_excluded_list(s: str) -> set:
+    if not s:
+        return set()
+    try:
+        return {item.strip() for item in shlex.split(s)}
+    except ValueError:
+        # fallback to simple comma split if shlex fails
+        return {item.strip() for item in s.split(',') if item.strip()}
 def is_dark_green(rgb_hex: str, tolerance: int = 10) -> bool:
     """Dark green: G > R and G > B with low brightness."""
     if len(rgb_hex) == 8:
@@ -70,6 +78,11 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
         sheet_name = wb.sheetnames[0]
     ws = wb[sheet_name]
 
+    # 获取排除名单
+    excluded_doctors_str = settings.get('ExcludedDoctors', '')
+    excluded_stations_str = settings.get('ExcludedStations', '')
+    excluded_doctors = parse_excluded_list(excluded_doctors_str)
+    excluded_stations = parse_excluded_list(excluded_stations_str)
     # --- 1. Parse month and dates ---
     month_cell = ws.cell(row=1, column=1)
     month_val = month_cell.value
@@ -351,7 +364,6 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
         else:
             # ignore
             pass
-
     # --- 7. Add stations to the model ---
     model.found_station_names = found_station_names
 
@@ -412,70 +424,6 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
         'Schwartz': ('No', 'No'),
     }
 
-    # # --- 9. Add doctors, handling duplicates (keep first occurrence) ---
-    # seen_doctors = set()
-    # # We'll attach overrides as attributes of the model
-    # model._active_override = {}
-    # model._weekend_override = {}
-    # model._inactive_doctors = {}   # store inactive doctors separately
-
-    # # Load the Doctors sheet from config once
-    # doctors_df = config.get('Doctors', pd.DataFrame())
-
-    # for row, name, fte, station in doctor_rows:
-    #     if name in seen_doctors:
-    #         continue
-    #     seen_doctors.add(name)
-
-    #     # Determine Active and Weekend
-    #     active_default = 'Yes'
-    #     weekend_default = 'Yes'
-
-    #     if name in special_doctor_defaults:
-    #         active_default, weekend_default = special_doctor_defaults[name]
-    #     elif station in station_defaults:
-    #         active_default, weekend_default = station_defaults[station]
-
-    #     # Store overrides for all doctors (for writing the sheet)
-    #     model._active_override[name] = active_default
-    #     model._weekend_override[name] = weekend_default
-        
-    #     # Read Allow92KMT and AllowNAZ from config
-    #     allow_92_kmt = False
-    #     allow_naz = False
-    #     if not doctors_df.empty:
-    #         doc_row = doctors_df[doctors_df['Name'] == name]
-    #         if not doc_row.empty:
-    #             if 'Allow92KMT' in doctors_df.columns:
-    #                 val = str(doc_row.iloc[0].get('Allow92KMT', 'No')).strip().upper()
-    #                 allow_92_kmt = val == 'YES'
-    #             if 'AllowNAZ' in doctors_df.columns:
-    #                 val = str(doc_row.iloc[0].get('AllowNAZ', 'No')).strip().upper()
-    #                 allow_naz = val == 'YES'
-
-    #     # Only add ACTIVE doctors to the model (they will be used by the solver)
-    #     if active_default == 'Yes':
-    #         doc = Doctor(
-    #             name=name,
-    #             fte=fte,
-    #             station=station,
-    #             weekend_available=(weekend_default == 'Yes'),
-    #             allow_92_kmt=allow_92_kmt,
-    #             allow_naz=allow_naz
-    #         )
-    #         model.doctors[name] = doc
-    #         model.doctor_row[name] = row
-    #     else:
-    #         # Store inactive for later writing (but not in model.doctors)
-    #         model._inactive_doctors[name] = {
-    #             'row': row,
-    #             'fte': fte,
-    #             'station': station,
-    #             'active': active_default,
-    #             'weekend': weekend_default
-    #         }
-    #         print(f"[Skipping inactive doctor]: {name} @ {station}")
-
     # --- 9. Add doctors, handling duplicates (keep first occurrence) ---
     seen_doctors = set()
     model._active_override = {}
@@ -486,12 +434,30 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
     doctors_df = config.get('Doctors', pd.DataFrame())
     # Create a lookup dict for fast access: name -> row (as Series)
     doctor_lookup = {str(row['Name']).strip(): row for _, row in doctors_df.iterrows()} if not doctors_df.empty else {}
-
+ 
     for row, name, fte, station in doctor_rows:
         if name in seen_doctors:
             continue
         seen_doctors.add(name)
-
+        # assign category
+        if name in doctor_lookup:
+            doc_row = doctor_lookup[name]
+            category = str(doc_row.get('Category', '')).strip().lower()
+            if category:
+                # Use explicit category from sheet
+                pass
+            else:
+                # Derive from station
+                if station in MAIN_STATIONS:
+                    category = 'main'
+                elif 'Springer' in station or 'Konsile' in station or 'Diagnostik' in station:
+                    category = 'jumper'
+                else:
+                    category = 'other'
+        else:
+            # fallback
+            category = 'other'
+            
         # ----- 1. Determine Active and Weekend from Doctors sheet if available -----
         if name in doctor_lookup:
             doc_row = doctor_lookup[name]
@@ -525,6 +491,10 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
             if 'AllowNAZ' in doctors_df.columns:
                 val = str(doc_row.get('AllowNAZ', 'No')).strip().upper()
                 allow_naz = val == 'YES'
+ 
+        if name in excluded_doctors or (station is not None and station in excluded_stations):
+            active_default = 'No'
+            print(f"[EXCLUDED] {name} forced inactive (via Settings exclusions)")
 
         # ----- 3. Add active doctors (skip inactive) -----
         if active_default == 'Yes':
@@ -534,7 +504,8 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                 station=station,
                 weekend_available=(weekend_default == 'Yes'),
                 allow_92_kmt=allow_92_kmt,
-                allow_naz=allow_naz
+                allow_naz=allow_naz,
+                category=category 
             )
             model.doctors[name] = doc
             model.doctor_row[name] = row
@@ -544,7 +515,10 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                 'fte': fte,
                 'station': station,
                 'active': active_default,
-                'weekend': weekend_default
+                'weekend': weekend_default,
+                'category': category,  # 存储计算好的类别
+                'allow_92_kmt': allow_92_kmt,  # 也存一下这两个特殊权限
+                'allow_naz': allow_naz
             }
             print(f"[Skipping inactive doctor]: {name} @ {station}")
     # --- 10. Skills ---
@@ -578,10 +552,21 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
         if name not in model.doctors:
             continue 
         for col, day_idx in day_cols.items():
+            if day_idx < len(model.days) and model.days[day_idx].is_weekend:
+                model.editable_cells.add((row, col))
+                if (row, col) in model.fixed_cells:
+                    model.fixed_cells.remove((row, col))
+                continue
             cell = ws.cell(row=row, column=col)
             val = cell.value
             is_fixed = False
             is_unavailable = False
+
+            # 判断是否为周末
+            if day_idx < len(model.days) and model.days[day_idx].is_weekend:
+                # 强制可编辑，不检查固定值、颜色等
+                model.editable_cells.add((row, col))
+                continue  # 跳过后续检查
 
             if val is not None and str(val).strip() in fixed_vals:
                 is_fixed = True
@@ -643,6 +628,13 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
                 else:
                     model.fixed_cells.add((row, col))
 
+    # 加固：遍历所有活跃医生，确保周末列都被添加
+    for doc_name, row in model.doctor_row.items():
+        for col, day_idx in day_cols.items():
+            if day_idx < len(model.days) and model.days[day_idx].is_weekend:
+                model.editable_cells.add((row, col))
+                if (row, col) in model.fixed_cells:
+                    model.fixed_cells.remove((row, col))
     # --- 12. Read HolidayRules sheet ---
     holiday_cfg = config.get('HolidayRules', pd.DataFrame())
     if not holiday_cfg.empty:
@@ -696,14 +688,38 @@ def parse_template(template_path: str, config: dict, wishes_path: str = None) ->
     print(f"[DONE!!!]: Parsing complete: found {len(model.doctors)} doctors and {len(model.stations)} stations.")
     return model
 
- 
+def ensure_doctor_active(doc_name: str, model: ScheduleModel) -> bool:
+    """如果医生在 _inactive_doctors 中且有固定任务需求，则重新激活他。"""
+    if doc_name in model.doctors:
+        return True
+    if hasattr(model, '_inactive_doctors') and doc_name in model._inactive_doctors:
+        info = model._inactive_doctors[doc_name]
+        doc = Doctor(
+            name=doc_name,
+            fte=info['fte'],
+            station=info['station'],
+            weekend_available=(info['weekend'] == 'Yes'),
+            allow_92_kmt=info.get('allow_92_kmt', False),
+            allow_naz=info.get('allow_naz', False),
+            category=info.get('category', 'other')
+        )
+        model.doctors[doc_name] = doc
+        model.doctor_row[doc_name] = info['row']
+        # 从 inactive 列表中移除，防止重复激活
+        del model._inactive_doctors[doc_name]
+        print(f"[REACTIVATED] {doc_name} due to fixed wish.")
+        return True
+    return False
+
 def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict, fixed_vals: set, vacation_color: str):
     """
-    Reads wishes file:
-      - Duty abbreviations (SD, ZD, KM, HD, NAZ, etc.) → **fixed assignment** at the doctor's station.
-      - Station codes (e.g., "92", "85", "65P") → high‑priority preference (priority=50),
-        and if on a weekend and station is one of the four main ones, becomes a fixed assignment.
-      - Fixed values (x, U, dgho, etc.) + green fill → unavailable (vacation/absence).
+    从愿望文件读取所有条目，**全部强制转为固定任务**，忽略：
+      - 假期/不可用（绿色填充、固定值）
+      - 权限（AllowNAZ、Allow92KMT）
+      - FTE（全职/兼职）
+      - 站匹配（任何医生可去任何站）
+      - 技能（自动添加所需技能）
+    仅保留同一医生同一天的冲突检测（若已有固定任务，则降级为偏好）。
     """
     wb = openpyxl.load_workbook(wishes_path, data_only=True)
     settings = config['Settings'].set_index('Setting')['Value'].to_dict()
@@ -712,7 +728,7 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
         sheet_name = wb.sheetnames[0]
     ws = wb[sheet_name]
 
-    # Load station code mapping
+    # 站代码映射
     station_code_map = {}
     if 'StationCodeMap' in config:
         df_map = config['StationCodeMap']
@@ -721,22 +737,21 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
             station = str(row['Station']).strip()
             station_code_map[code] = station
 
-    # Build set of duty abbreviations
     duty_abbrs = set(model.duty_types.keys())
 
     doctor_name_col = settings.get('DoctorNameColumn', 'A')
     doctor_name_col_idx = column_index_from_string(doctor_name_col)
 
-    # Map wish‑file doctor names (clean)
+    # 收集愿望文件中出现的医生（包括 inactive）
     wish_rows = {}
     for row in range(1, ws.max_row + 1):
         cell = ws.cell(row=row, column=doctor_name_col_idx)
         if cell.value and isinstance(cell.value, str):
             name = cell.value.strip().replace('*', '').strip()
-            if name in model.doctors:
+            if name in model.doctors or (hasattr(model, '_inactive_doctors') and name in model._inactive_doctors):
                 wish_rows[name] = row
 
-    # Parse date columns
+    # 解析日期列
     date_row = 1
     day_cols_wish = {}
     for col in range(1, ws.max_column + 1):
@@ -768,6 +783,8 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
                 break
             day_cols_wish[col] = day_idx
 
+    fixed_assignments_set = set()  # 用于检测同一天同一医生的重复固定任务
+
     for doc_name, row in wish_rows.items():
         for col, day_idx in day_cols_wish.items():
             cell = ws.cell(row=row, column=col)
@@ -778,7 +795,7 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
             if not val_str:
                 continue
 
-            # Normalise: remove spaces, strip trailing .0, convert numeric codes
+            # 标准化：去除空格，转换数字
             norm_str = val_str.replace(' ', '')
             if norm_str.endswith('.0'):
                 norm_str = norm_str[:-2]
@@ -789,34 +806,50 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
             except ValueError:
                 pass
             norm_upper = norm_str.upper()
+            norm_lower = norm_str.lower()
 
-            # ---------- 1. Check if it's a duty abbreviation ----------
+            # 激活医生（如果被排除）
+            ensure_doctor_active(doc_name, model)
+            if doc_name not in model.doctors:
+                continue
+
+            # ----- 1. 检查是否为职责缩写 -----
             if norm_upper in duty_abbrs:
                 duty_abbr = norm_upper
-                # Add as a preference (high priority)
-                model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
-                # print(f"[WISH] (duty): {doc_name} wants {duty_abbr} on {model.days[day_idx].date} (priority 100)")
-    
-                # Determine station for fixed assignment
+
+                # 冲突检测：同一天同一医生已有固定任务
+                if (doc_name, day_idx) in fixed_assignments_set:
+                    print(f"[CONFLICT] {doc_name} already fixed on {model.days[day_idx].date}, downgrading {duty_abbr} to preference")
+                    model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 50))
+                    continue
+                else:
+                    fixed_assignments_set.add((doc_name, day_idx))
+
+                # 确定站（若为全局任务则用 Global）
                 if duty_abbr in GLOBAL_DUTIES:
                     station = GLOBAL_STATION
                 else:
                     station = model.doctors[doc_name].station
-                if station:
-                    model.fixed_assignments.append((doc_name, day_idx, station, duty_abbr))
-                    # print(f"[FIXED] (duty): {doc_name} must work {duty_abbr} at {station} on {model.days[day_idx].date}")
-                    if duty_abbr not in model.doctors[doc_name].skills:
-                        model.doctors[doc_name].skills.add(duty_abbr)
-                        print(f"Auto‑added skill {duty_abbr} to {doc_name}")
-                else:
-                    print(f"Could not add fixed assignment: {doc_name} has no station.")
-                continue # skip further checks
+                    if not station:
+                        print(f"Warning: {doc_name} has no station, cannot fix {duty_abbr}, will add as preference.")
+                        model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
+                        continue
 
-            # ---------- 2. Check fixed values → unavailable ----------
+                # 自动添加技能（若缺失）
+                if duty_abbr not in model.doctors[doc_name].skills:
+                    model.doctors[doc_name].skills.add(duty_abbr)
+                    print(f"Auto‑added skill {duty_abbr} to {doc_name}")
+
+                model.fixed_assignments.append((doc_name, day_idx, station, duty_abbr))
+                model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
+                print(f"[FIXED] (duty): {doc_name} -> {duty_abbr} at {station} on {model.days[day_idx].date}")
+                continue
+
+            # ----- 2. 检查是否为固定值（如 x, U, dgho 等）→ 记录不可用（但不阻止固定任务）-----
             is_fixed = False
             if val_str in fixed_vals:
                 is_fixed = True
-            # Check green fill
+            # 绿色填充
             if cell.fill and isinstance(cell.fill, PatternFill):
                 color = cell.fill.start_color
                 if color and color.rgb:
@@ -825,32 +858,59 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
                         is_fixed = True
                     elif len(rgb) == 6 and rgb.upper() == vacation_color[-6:].upper():
                         is_fixed = True
-
             if is_fixed:
                 model.unavailable.add((doc_name, day_idx))
-                print(f"[unavailable]: {doc_name} on {model.days[day_idx].date} (fixed value)")
+                print(f"[unavailable] recorded: {doc_name} on {model.days[day_idx].date} (will be ignored for fixed wishes)")
                 continue
 
-            # ---------- 3. Check station code ----------
-            norm_lower = norm_str.lower()
+            # ----- 3. 检查是否为站代码 -----
             if norm_lower in station_code_map:
                 station = station_code_map[norm_lower]
-                if model.days[day_idx].is_weekend:
-                    duty_abbr = 'PR'
-                    if station in ['65 PP', '85 Häm/Onk/Rheu', '92 KMT', '65 LAF']:
-                        model.fixed_assignments.append((doc_name, day_idx, station, duty_abbr))
-                        print(f"[fixed] (station): {doc_name} want a {duty_abbr} duty on Station {station} on {model.days[day_idx].date}")
-                        model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
-                        continue
-                else:
-                    duty_abbr = 'ZD'
-                model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 50))
-                print(f"[WISH] (station): {doc_name} wants {duty_abbr} at {station} on {model.days[day_idx].date}")
-            else:
-                # Ignore anything else
-                print(f"[Ignored]: {doc_name} on {model.days[day_idx].date} has value '{val_str}'")
 
-    # ----- Parse NAZ demand rows (e.g., "NAZ-Dienst(NAZ)", "Lewetag (IM8)") -----
+                # 确定班次类型：周末 → PR，否则 → ZD
+                duty_abbr = 'PR' if model.days[day_idx].is_weekend else 'ZD'
+
+                # 冲突检测
+                if (doc_name, day_idx) in fixed_assignments_set:
+                    print(f"[CONFLICT] {doc_name} already fixed on {model.days[day_idx].date}, downgrading {duty_abbr} to preference")
+                    model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 50))
+                    continue
+                else:
+                    fixed_assignments_set.add((doc_name, day_idx))
+
+                # 自动添加技能（若缺失）
+                if duty_abbr not in model.doctors[doc_name].skills:
+                    model.doctors[doc_name].skills.add(duty_abbr)
+                    print(f"Auto‑added skill {duty_abbr} to {doc_name}")
+
+                model.fixed_assignments.append((doc_name, day_idx, station, duty_abbr))
+                model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
+                print(f"[FIXED] (station): {doc_name} -> {duty_abbr} at {station} on {model.days[day_idx].date}")
+                continue
+ 
+
+                # # 冲突检测
+                # if (doc_name, day_idx) in fixed_assignments_set:
+                #     print(f"[CONFLICT] {doc_name} already fixed on {model.days[day_idx].date}, downgrading {duty_abbr} to preference")
+                #     model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 50))
+                #     continue
+                # else:
+                #     fixed_assignments_set.add((doc_name, day_idx))
+
+                # # 自动添加技能
+                # if duty_abbr not in model.doctors[doc_name].skills:
+                #     model.doctors[doc_name].skills.add(duty_abbr)
+                #     print(f"Auto‑added skill {duty_abbr} to {doc_name}")
+
+                # model.fixed_assignments.append((doc_name, day_idx, station, duty_abbr))
+                # model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
+                # print(f"[FIXED] (station): {doc_name} -> {duty_abbr} at {station} on {model.days[day_idx].date}")
+                # continue
+
+            # # 其他任何内容忽略
+            # print(f"[Ignored]: {doc_name} on {model.days[day_idx].date} has value '{val_str}'")
+
+    # ----- 解析 NAZ 需求行（如 "NAZ-Dienst(NAZ)"）-----
     naz_demand_days = set()
     for row in range(1, ws.max_row + 1):
         cell_a = ws.cell(row=row, column=1)
@@ -859,12 +919,9 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
         val_b = cell_b.value if cell_b else ''
         if val_a is None: val_a = ''
         if val_b is None: val_b = ''
-        # Skip if this row is already a doctor row (avoid double counting)
         if row in wish_rows.values():
             continue
-        # Look for 'NAZ' in column A or B (case‑insensitive)
         if 'NAZ' in str(val_a).upper() or 'NAZ' in str(val_b).upper():
-            # Scan all date columns
             for col, day_idx in day_cols_wish.items():
                 cell = ws.cell(row=row, column=col)
                 val = cell.value
@@ -875,5 +932,4 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
                     naz_demand_days.add(day_idx)
                     print(f"[NAZ demand] day {day_idx} ({model.days[day_idx].date}) from wishes row {row}")
 
-    # Store in model for later use in demand builder
     model.naz_demand_days = naz_demand_days

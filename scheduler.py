@@ -26,9 +26,14 @@ def create_default_config(config_path: str):
         # Settings
         settings = pd.DataFrame({
             'Setting': ['TemplateFile', 'OutputFile', 'ScheduleSheet', 'ScheduleStartCell', 'ScheduleEndCell',
-                        'DoctorNameColumn', 'StationColumn', 'FixedValues', 'EditablePlaceholder', 'VacationColor'],
+                        'DoctorNameColumn', 'StationColumn', 'FixedValues', 'EditablePlaceholder', 'VacationColor'
+                        'ExcludedDoctors', 'ExcludedStations'   # 新增
+                    ],
             'Value': ['Stationsplan_October_2026.xlsx', 'Stationsplan_October_2026_out.xlsx',
-                      'Plan', 'B2', '', 'A', 'B', 'x, F, X, U, u, dgho, NAZ, 65P, 92.0, 85.0', '0', '00FF00']
+                      'Plan', 'B2', '', 'A', 'B', 'x, F, X, U, u, dgho, NAZ, 65P, 92.0, 85.0', '0', '00FF00',
+                      'Bross-Bach, Möhle, Häring, A., Max-Felix, Maier, Reuß, Bethge, Xenitidis, Henes, Pecher,Schaub,Rörden, Besemer, Faul, Vogel, Wirths,Bethge,Private Sono',
+                      'Labor 20, Rotation, Forschung, 93 (3 IS), Aufnahme, Balingen, GBA-Rheumazentrum 50 %, INDIRA, Rheuma 1,Rheuma 2,Rheuma 3, Sonographie, Amb 1 (Lymphom/allgemein),Amb 2 (allgemein/Gerinnung),Amb 3 (spezialisiert mix),Amb 4 (Myelom)'
+                      ]
         })
         settings.to_excel(writer, sheet_name='Settings', index=False)
         #for special weekend days (holidays)
@@ -43,7 +48,7 @@ def create_default_config(config_path: str):
             'FTE (%)': [100, 100, 80, 100],
             'Station': ['85 Häm/Onk/Rheu', '92 KMT', '65 PP', '92 KMT'],
             'Active': ['Yes', 'Yes', 'Yes', 'Yes'],
-            'Weekend': ['Yes', 'Yes', 'No', 'Yes']   # NEW
+            'Weekend': ['Yes', 'Yes', 'No', 'Yes']
         })
         doctors.to_excel(writer, sheet_name='Doctors', index=False)
 
@@ -72,10 +77,10 @@ def create_default_config(config_path: str):
         })
         duty_types.to_excel(writer, sheet_name='DutyTypes', index=False)
 
-        # GeneralRules
+        # GeneralRules 
         general = pd.DataFrame({
-            'RuleName': ['MaxConsecutiveWorkDays', 'MaxDutiesPerWeek'],
-            'Value': [6, 5]
+            'RuleName': ['MaxConsecutiveWorkDays', 'MaxDutiesPerWeek', 'MainDoctorMaxWeekend'],
+            'Value': [6, 5, 1]
         })
         general.to_excel(writer, sheet_name='GeneralRules', index=False)
 
@@ -258,7 +263,10 @@ def write_missing_config_sheets(model: ScheduleModel, config_path: str):
 
         # Other required sheets (if missing)
         required_sheets = {
-            'GeneralRules': pd.DataFrame({'RuleName': ['MaxConsecutiveWorkDays', 'MaxDutiesPerWeek'], 'Value': [6, 5]}),
+            'GeneralRules': pd.DataFrame({
+                                        'RuleName': ['MaxConsecutiveWorkDays', 'MaxDutiesPerWeek', 'MainDoctorMaxWeekend'],
+                                        'Value': [6, 5, 1]
+                                        }),
             'Penalties': pd.DataFrame({'Penalty': [
                                                 'Preference',
                                                 'WorkloadBalance',
@@ -433,6 +441,13 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
 
     # Reload config: to pick up the newly written sheets
     config = load_config(config_path)   # now the Doctors sheet reflects the template
+
+    general = config.get('GeneralRules', pd.DataFrame())
+    if general.empty or 'MainDoctorMaxWeekend' not in general['RuleName'].values:
+        new_row = pd.DataFrame({'RuleName': ['MainDoctorMaxWeekend'], 'Value': [1]})
+        general = pd.concat([general, new_row], ignore_index=True)
+        config['GeneralRules'] = general
+
     print(f"[INFO] Config loaded...")
     # Update schedule's duty_types from the reloaded config
     duty_cfg = config.get('DutyTypes', pd.DataFrame())

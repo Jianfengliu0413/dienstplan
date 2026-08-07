@@ -15,6 +15,12 @@ def add_hard_constraints(
     doctors: List[str],
     demand: dict
 ) -> None:
+    duty_map = { (day_idx, station, abbr): i for i, (day_idx, station, abbr) in enumerate(duties) }
+    fixed_duty_indices = set()
+    for doc_name, day_idx, station, duty_abbr in schedule.fixed_assignments:
+        key = (day_idx, station, duty_abbr)
+        if key in duty_map:
+            fixed_duty_indices.add(duty_map[key])
     constraints_cfg = config.get('Constraints', pd.DataFrame())
     if not constraints_cfg.empty and 'Constraint' in constraints_cfg.columns:
         constraints_cfg = constraints_cfg.set_index('Constraint')['Enabled'].to_dict()
@@ -43,53 +49,86 @@ def add_hard_constraints(
         for j in range(num_doctors):
             model_cp.Add(sum(x_vars[(i, j)] for i in duty_list) <= 1)
 
+    # # 3. Station match
+    # for i, (day_idx, station, abbr) in enumerate(duties):
+    #     if i in fixed_duty_indices: continue
+    #     if station == GLOBAL_STATION and abbr == 'SD':
+    #         # 收集当天可用的主站医生
+    #         main_available = []
+    #         for j, doc_name in enumerate(doctors):
+    #             if schedule.doctors[doc_name].station in MAIN_STATIONS:
+    #                 if (doc_name, day_idx) not in schedule.unavailable:
+    #                     # 如果当天已有固定任务，求解器会在后续约束中处理，但这里我们只排除 unavailable
+    #                     main_available.append(j)
+    #         if main_available:
+    #             allowed = main_available
+    #         else:
+    #             allowed = list(range(num_doctors))
+    #             print(f"Global SD on day {day_idx}: no available main‑station doctors – allowing all")
     # 3. Station match
     for i, (day_idx, station, abbr) in enumerate(duties):
-        if station == GLOBAL_STATION:
-            if abbr == 'SD':
-                # Prefer main‑station doctors, but fallback to all if none available
-                main_allowed = [j for j, doc_name in enumerate(doctors)
-                                if schedule.doctors[doc_name].station in MAIN_STATIONS]
-                if main_allowed:
-                    allowed = main_allowed
+        if i in fixed_duty_indices: continue
+        if station == GLOBAL_STATION and abbr in ['SD', 'HD', 'NAZ']:
+            # 主站优先
+            main_candidates = []
+            for j, doc_name in enumerate(doctors):
+                if schedule.doctors[doc_name].station not in MAIN_STATIONS:
+                    continue
+                if (doc_name, day_idx) in schedule.unavailable:
+                    continue
+                if abbr == 'NAZ' and not schedule.doctors[doc_name].allow_naz:
+                    continue
+                main_candidates.append(j)
+            if main_candidates:
+                allowed = main_candidates
+            else:
+                # fallback: 所有符合条件的医生
+                fallback = []
+                for j, doc_name in enumerate(doctors):
+                    if (doc_name, day_idx) in schedule.unavailable:
+                        continue
+                    if abbr == 'NAZ' and not schedule.doctors[doc_name].allow_naz:
+                        continue
+                    fallback.append(j)
+                if fallback:
+                    allowed = fallback
                 else:
                     allowed = list(range(num_doctors))
-                    print(f"Global SD on day {day_idx}: no main‑station doctors – allowing all")
-            else:
-                allowed = list(range(num_doctors))
+                print(f"Global {abbr} on day {day_idx}: no available main‑station doctors – allowing all")
+            model_cp.Add(sum(x_vars[(i, j)] for j in allowed) == 1)
         else:
             if abbr == 'SUB':
                 allowed = [j for j, doc_name in enumerate(doctors) 
                         if schedule.doctors[doc_name].station == '65 PP']
             elif schedule.days[day_idx].is_weekend and abbr == 'PR':
-                allowed = list(range(num_doctors))
-                # # 
-                # # Prefer doctors from the same station
-                # home_doctors = [j for j, doc_name in enumerate(doctors)
-                #                 if schedule.doctors[doc_name].station == station]
-                # # Filter out unavailable and those already fixed to another duty that day
-                # available_home = []
-                # for j in home_doctors:
-                #     doc_name = doctors[j]
-                #     if (doc_name, day_idx) in schedule.unavailable:
-                #         continue
-                #     if any(d == day_idx for _, d, _, _ in schedule.fixed_assignments if _ == doc_name):
-                #         continue
-                #     available_home.append(j)
-                # if available_home:
-                #     allowed = available_home
-                # else:
-                #     # Fallback: any doctor not unavailable and not fixed that day
-                #     fallback = [j for j, doc_name in enumerate(doctors)
-                #                 if (doc_name, day_idx) not in schedule.unavailable
-                #                 and not any(d == day_idx for _, d, _, _ in schedule.fixed_assignments if _ == doc_name)]
-                #     if fallback:
-                #         allowed = fallback
-                #     else:
-                #         allowed = list(range(num_doctors))
-                #         print(f"PR on day {day_idx}, station {station}: no eligible doctors – allowing all")
 
-            
+                allowed = get_weekend_duty_allowed(day_idx, station, abbr, doctors, schedule, num_doctors)
+                model_cp.Add(sum(x_vars[(i, j)] for j in allowed) == 1)
+                # # allowed = get_allowed_doctors_for_weekend_pr(day_idx, station, doctors, schedule)
+                # # # Ensure allowed is not empty (fallback to all)
+                # # if not allowed:
+                # #     allowed = list(range(num_doctors))
+
+                # # In constraint building:
+                # main_doctors = [j for j in range(num_doctors) if schedule.doctors[doctors[j]].category == 'main'
+                #                 and (doctors[j], day_idx) not in schedule.unavailable
+                #                 and not any(d == day_idx for _, d, _, _ in schedule.fixed_assignments if _ == doctors[j])]
+                # if main_doctors:
+                #     allowed = main_doctors
+                # else:
+                #     jumper_doctors = [j for j in range(num_doctors) if schedule.doctors[doctors[j]].category == 'jumper'
+                #                     and (doctors[j], day_idx) not in schedule.unavailable
+                #                     and not any(d == day_idx for _, d, _, _ in schedule.fixed_assignments if _ == doctors[j])]
+                #     if jumper_doctors:
+                #         allowed = jumper_doctors
+                #     else:
+                #         # fallback to any doctor
+                #         allowed = [j for j in range(num_doctors) if (doctors[j], day_idx) not in schedule.unavailable
+                #                 and not any(d == day_idx for _, d, _, _ in schedule.fixed_assignments if _ == doctors[j])]
+                #         if not allowed:
+                #             allowed = list(range(num_doctors))
+
+                # model_cp.Add(sum(x_vars[(i, j)] for j in allowed) == 1)
             else:
                 if abbr == 'SD':
                     # Station‑specific SD: only doctors from the same station
@@ -128,6 +167,7 @@ def add_hard_constraints(
 
     # 3.2 Special rule for SUB duties: only doctors from 65 PP can cover
     for i, (day_idx, station, abbr) in enumerate(duties):
+        if i in fixed_duty_indices: continue
         if abbr == 'SUB':
             allowed = [j for j, doc_name in enumerate(doctors)
                        if schedule.doctors[doc_name].station == '65 PP']
@@ -139,6 +179,7 @@ def add_hard_constraints(
     # Identify KM duties and group by week and station (though station is always 92 KMT)
     km_duties_by_week = defaultdict(list)
     for i, (day_idx, station, abbr) in enumerate(duties):
+        if i in fixed_duty_indices: continue
         if abbr == 'KM':
             week_num = schedule.days[day_idx].date.isocalendar().week
             km_duties_by_week[week_num].append(i)
@@ -153,12 +194,14 @@ def add_hard_constraints(
 
     # 4. Skills: doctor must have the duty in their skills
     for i, (day_idx, station, abbr) in enumerate(duties):
+        if i in fixed_duty_indices: continue
         for j, doc_name in enumerate(doctors):
             if abbr not in schedule.doctors[doc_name].skills:
                 model_cp.Add(x_vars[(i, j)] == 0)
 
     # 5. Vacation / unavailable (hard)
     for i, (day_idx, station, abbr) in enumerate(duties):
+        if i in fixed_duty_indices: continue
         for j, doc_name in enumerate(doctors):
             if (doc_name, day_idx) in schedule.unavailable:
                 model_cp.Add(x_vars[(i, j)] == 0)
@@ -167,6 +210,7 @@ def add_hard_constraints(
     has_senior = any('Senior' in schedule.doctors[doc_name].skills for doc_name in doctors)
     if has_senior:
         for i, (day_idx, station, abbr) in enumerate(duties):
+            if i in fixed_duty_indices: continue
             duty = schedule.duty_types[abbr]
             station_obj = schedule.stations.get(station)
             requires_senior = duty.requires_senior or (station_obj and station_obj.requires_senior)
@@ -180,6 +224,7 @@ def add_hard_constraints(
     # 7. Weekend only duties: only on weekends
     if constraints_cfg.get('WeekendOnly', 'Yes') == 'Yes':
         for i, (day_idx, station, abbr) in enumerate(duties):
+            if i in fixed_duty_indices: continue
             if schedule.duty_types[abbr].weekend_only and not schedule.days[day_idx].is_weekend:
                 for j in range(num_doctors):
                     model_cp.Add(x_vars[(i, j)] == 0)
@@ -197,6 +242,7 @@ def add_hard_constraints(
     # 8. Weekend shifts only for 100% FTE doctors
     if constraints_cfg.get('WeekendOnlyFullTime', 'Yes') == 'Yes':
         for i, (day_idx, station, abbr) in enumerate(duties):
+            if i in fixed_duty_indices: continue
             if schedule.days[day_idx].is_weekend:
                 for j, doc_name in enumerate(doctors):
                     if schedule.doctors[doc_name].fte < 100:
@@ -205,6 +251,7 @@ def add_hard_constraints(
     # 9. Weekend availability per doctor (from Weekend column)
     if constraints_cfg.get('WeekendAvailability', 'Yes') == 'Yes':
         for i, (day_idx, station, abbr) in enumerate(duties):
+            if i in fixed_duty_indices: continue
             if schedule.days[day_idx].is_weekend:
                 for j, doc_name in enumerate(doctors):
                     if not schedule.doctors[doc_name].weekend_available:
@@ -221,6 +268,7 @@ def add_hard_constraints(
     # 10. Only doctors who are available on weekends (Weekend column = Yes) can work on weekends
     if constraints_cfg.get('WeekendOnlyForSkilled', 'Yes') == 'Yes':
         for i, (day_idx, station, abbr) in enumerate(duties):
+            if i in fixed_duty_indices: continue
             if schedule.days[day_idx].is_weekend:
                 for j, doc_name in enumerate(doctors):
                     if not schedule.doctors[doc_name].weekend_available:
@@ -257,18 +305,19 @@ def add_hard_constraints(
                     if duty_indices_in_week:
                         model_cp.Add(sum(x_vars[(i, j)] for i in duty_indices_in_week) <= max_week)
 
-    # 13. Special: Weekend PR at 92 KMT only for doctors with allow_92_kmt=True ---
-    allowed_92_indices = [
-        j for j, doc_name in enumerate(doctors)
-        if schedule.doctors[doc_name].allow_92_kmt
-    ]
-    for i, (day_idx, station, abbr) in enumerate(duties):
-        if station == '92 KMT' and schedule.days[day_idx].is_weekend and abbr == 'PR':
-            if allowed_92_indices:
-                model_cp.Add(sum(x_vars[(i, j)] for j in allowed_92_indices) == 1)
-            else:
-                # No allowed doctors – force infeasible if such duty exists
-                model_cp.Add(0 == 1)
+    # # 13. Special: Weekend PR at 92 KMT only for doctors with allow_92_kmt=True ---
+    # allowed_92_indices = [
+    #     j for j, doc_name in enumerate(doctors)
+    #     if schedule.doctors[doc_name].allow_92_kmt
+    # ]
+    # for i, (day_idx, station, abbr) in enumerate(duties):
+    #     if i in fixed_duty_indices: continue
+    #     if station == '92 KMT' and schedule.days[day_idx].is_weekend and abbr == 'PR':
+    #         if allowed_92_indices:
+    #             model_cp.Add(sum(x_vars[(i, j)] for j in allowed_92_indices) == 1)
+    #         else:
+    #             # No allowed doctors – force infeasible if such duty exists
+    #             model_cp.Add(0 == 1)
 
     # 14. NAZ shifts: only doctors with allow_naz=True ---
     allowed_naz_indices = [
@@ -276,6 +325,7 @@ def add_hard_constraints(
         if schedule.doctors[doc_name].allow_naz
     ]
     for i, (day_idx, station, abbr) in enumerate(duties):
+        if i in fixed_duty_indices: continue
         if abbr == 'NAZ':
             if allowed_naz_indices:
                 model_cp.Add(sum(x_vars[(i, j)] for j in allowed_naz_indices) == 1)
@@ -321,6 +371,7 @@ def add_hard_constraints(
     # 18. No weekend duty if bridge day
     if constraints_cfg.get('BridgeDay', 'No') == 'Yes':
         for i, (day_idx, station, abbr) in enumerate(duties):
+            if i in fixed_duty_indices: continue
             if not schedule.days[day_idx].is_weekend:
                 continue
             weekday = schedule.days[day_idx].date.weekday()
@@ -329,3 +380,132 @@ def add_hard_constraints(
                     model_cp.Add(x_vars[(i, j)] == 0)
                 elif weekday == 6 and (doc_name, day_idx + 1) in schedule.unavailable:
                     model_cp.Add(x_vars[(i, j)] == 0)
+
+    # 19. Main station doctors: max weekend duty cap (reads from GeneralRules)
+    # Fixed assignments (wishes) are excluded from this cap.
+    if constraints_cfg.get('MainDoctorMaxOneWeekend', 'Yes') == 'Yes':
+        max_main_weekend = int(general.get('MainDoctorMaxWeekend', 1))
+        for j, doc_name in enumerate(doctors):
+            if schedule.doctors[doc_name].category == 'main':
+                # Only count weekend duties that are NOT fixed assignments
+                weekend_indices = [
+                    i for i, (day_idx, _, _) in enumerate(duties)
+                    if schedule.days[day_idx].is_weekend and i not in fixed_duty_indices
+                ]
+                if weekend_indices:
+                    model_cp.Add(sum(x_vars[(i, j)] for i in weekend_indices) <= max_main_weekend)
+
+def get_allowed_doctors_for_weekend_pr(day_idx, station, doctors, schedule):
+    """
+    Return list of doctor indices in priority order:
+    1. main station doctors (from station itself, and any main station)
+    2. jumper doctors
+    3. all other doctors (except those unavailable)
+    """
+    num_doctors = len(doctors)
+    # Prepare availability masks
+    unavailable = set()
+    fixed_today = set()
+    for doc_name, d, _, _ in schedule.fixed_assignments:
+        if d == day_idx:
+            fixed_today.add(doc_name)
+    for doc_name, d in schedule.unavailable:
+        if d == day_idx:
+            unavailable.add(doc_name)
+
+    # 1. Main station doctors (any main station, but prefer same station first)
+    main_indices = []
+    same_station_main = []
+    for j, doc_name in enumerate(doctors):
+        if doc_name in unavailable or doc_name in fixed_today:
+            continue
+        if schedule.doctors[doc_name].category == 'main':
+            if schedule.doctors[doc_name].station == station:
+                same_station_main.append(j)
+            else:
+                main_indices.append(j)
+    # Put same station first, then other main stations
+    main_ordered = same_station_main + [j for j in main_indices if j not in same_station_main]
+
+    # 2. Jumper doctors
+    jumper_indices = [j for j, doc_name in enumerate(doctors) if schedule.doctors[doc_name].category == 'jumper'
+                      and doc_name not in unavailable and doc_name not in fixed_today]
+
+    # 3. Other doctors (excluding main and jumper)
+    other_indices = [j for j, doc_name in enumerate(doctors) if schedule.doctors[doc_name].category not in ('main', 'jumper')
+                     and doc_name not in unavailable and doc_name not in fixed_today]
+
+    # Combine
+    allowed = main_ordered + jumper_indices + other_indices
+    # Additionally, we must ensure that if no main are available, we still allow others.
+    # But we also need to enforce that if main exist, we only allow them? That would be too strict.
+    # We'll use a soft constraint later, but here we allow all but prioritize.
+    # For hard constraint, we only enforce that the doctor must be from one of these.
+    # The priority will be handled in the objective.
+    # So we return the full list.
+    return allowed
+
+# def get_weekend_duty_allowed(day_idx, station, abbr, doctors, schedule, num_doctors):
+#     # Build set of unavailable and fixed today
+#     unavailable = set()
+#     fixed_today = set()
+#     for doc_name, d, _, _ in schedule.fixed_assignments:
+#         if d == day_idx:
+#             fixed_today.add(doc_name)
+#     for doc_name, d in schedule.unavailable:
+#         if d == day_idx:
+#             unavailable.add(doc_name)
+
+#     # Step 1: main doctors from the same station
+#     same_main = [j for j, doc_name in enumerate(doctors)
+#                  if schedule.doctors[doc_name].category == 'main'
+#                  and schedule.doctors[doc_name].station == station
+#                  and doc_name not in unavailable
+#                  and doc_name not in fixed_today]
+#     if same_main:
+#         return same_main
+
+#     # Step 2: main doctors from any main station
+#     any_main = [j for j, doc_name in enumerate(doctors)
+#                 if schedule.doctors[doc_name].category == 'main'
+#                 and doc_name not in unavailable
+#                 and doc_name not in fixed_today]
+#     if any_main:
+#         return any_main
+
+#     # Step 3: jumper doctors
+#     jumpers = [j for j, doc_name in enumerate(doctors)
+#                if schedule.doctors[doc_name].category == 'jumper'
+#                and doc_name not in unavailable
+#                and doc_name not in fixed_today]
+#     if jumpers:
+#         return jumpers
+
+#     # Step 4: any other available doctor
+#     others = [j for j, doc_name in enumerate(doctors)
+#               if doc_name not in unavailable
+#               and doc_name not in fixed_today]
+#     if others:
+#         return others
+
+#     # Ultimate fallback: all (might include unavailable/fixed, but those will be blocked later)
+#     return list(range(num_doctors))
+
+def get_weekend_duty_allowed(day_idx, station, abbr, doctors, schedule, num_doctors):
+    # Build set of unavailable and fixed today
+    unavailable = set()
+    fixed_today = set()
+    for doc_name, d, _, _ in schedule.fixed_assignments:
+        if d == day_idx:
+            fixed_today.add(doc_name)
+    for doc_name, d in schedule.unavailable:
+        if d == day_idx:
+            unavailable.add(doc_name)
+
+    # All doctors except unavailable and fixed (they will be blocked later)
+    allowed = [j for j, doc_name in enumerate(doctors)
+               if doc_name not in unavailable and doc_name not in fixed_today]
+    # If none available, allow all (fallback)
+    if not allowed:
+        allowed = list(range(num_doctors))
+    return allowed

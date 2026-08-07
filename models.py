@@ -13,7 +13,7 @@ class Doctor:
     weekend_available: bool = True
     allow_92_kmt: bool = False
     allow_naz: bool = False
-    
+    category: str = "other"   # "main", "jumper", "other"
 
 @dataclass
 class DutyType:

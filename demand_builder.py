@@ -5,14 +5,7 @@ Computes for each station and day which duties are required.
 
 from models import ScheduleModel
 from collections import defaultdict
-import pandas as pd
-
-NO_SUBSTITUTE_STATIONS = {'Rotation Med I', 'Aufnahme', 'Labor', 'Forschung', 'Elternzeit', 
-                          'Balingen','Sprechstunde PP/Oberärzte','Springer/Konsile/Diagnostik',
-                          '93 (3 IS)','Amb 1 (Lymphom/allgemein)','Amb 2 (allgemein/Gerinnung)',
-                          'Amb 3 (spezialisiert mix)','Amb 4 (Myelom)','KMT 1','KMT 2','Rheuma 1','Rheuma 2','Rheuma 3'
-                          }
-
+import pandas as pd 
 MAIN_STATIONS = {'65 PP', '65 LAF', '85 Häm/Onk/Rheu', '92 KMT'}
 GLOBAL_STATION = 'Global'
 GLOBAL_DUTIES = {'HD', 'NAZ', 'SD'}
@@ -20,11 +13,23 @@ GLOBAL_DUTIES = {'HD', 'NAZ', 'SD'}
 def build_demand(model: ScheduleModel, config: dict) -> dict:
     demand = defaultdict(lambda: defaultdict(int))
 
+    # --- Read ExcludedStations from Settings ---
+    settings_df = config.get('Settings', pd.DataFrame())
+    excluded_stations_str = ""
+    if not settings_df.empty and 'Setting' in settings_df.columns:
+        row = settings_df[settings_df['Setting'] == 'ExcludedStations']
+        if not row.empty:
+            excluded_stations_str = str(row.iloc[0]['Value'])
+    excluded_stations = {s.strip() for s in excluded_stations_str.split(',') if s.strip()}
+
     # 1. Load base demand from Stations
     station_cfg = config.get('Stations', pd.DataFrame())
     for _, row in station_cfg.iterrows():
         name = str(row['Station']).strip()
         if name not in model.stations:
+            continue
+        if name in excluded_stations:
+            print(f"[Skip] Station '{name}' is excluded – no demand added.")
             continue
 
         weekday_counts = {}
@@ -87,6 +92,8 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
         is_weekend = day.is_weekend
 
         for station_name, station in model.stations.items():
+            if station_name in excluded_stations:
+                continue
             if is_weekend:
                 counts = station.weekend_demand.copy()
             else:
@@ -143,11 +150,11 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
             print(f"[Demand] Added NAZ on {model.days[day_idx].date} from wishes")
 
     # 4. SUBSTITUTION LOGIC
-    demand = add_substitute_demand(model, demand)
+    demand = add_substitute_demand(model, demand, excluded_stations)
 
     return demand
 
-def add_substitute_demand(model: ScheduleModel, demand: dict) -> dict:
+def add_substitute_demand(model: ScheduleModel, demand: dict, excluded_stations: set) -> dict:
     """
     For each station found in the template, if no doctor from that station is available on a day,
     and the station row does NOT have a '0' on that day, add a SUB duty.
@@ -170,7 +177,7 @@ def add_substitute_demand(model: ScheduleModel, demand: dict) -> dict:
     stations_to_check = set(model.found_station_names) | stations_with_demand
 
     for station in stations_to_check:
-        if station in NO_SUBSTITUTE_STATIONS or station == '65 PP':
+        if station in excluded_stations:
             continue
         docs = station_doctors.get(station, [])
         if not docs:
@@ -197,5 +204,16 @@ def add_substitute_demand(model: ScheduleModel, demand: dict) -> dict:
                     continue
                 # Add SUB
                 demand[(day_idx, station)]['SUB'] = demand[(day_idx, station)].get('SUB', 0) + 1
-                print(f"🔄 SUB needed: {station} on {model.days[day_idx].date} – adding SUB duty.")
+                print(f"SUB needed: {station} on {model.days[day_idx].date} – adding SUB duty.")
+
+    # # --- 强制每个周末每个主站必须有 PR ---
+    # for day_idx, day in enumerate(model.days):
+    #     if day.is_weekend:
+    #         for station_name in MAIN_STATIONS:
+    #             # 无论是否存在，强制确保至少一个 PR
+    #             demand.setdefault((day_idx, station_name), {})
+    #             demand[(day_idx, station_name)]['PR'] = max(
+    #                 demand[(day_idx, station_name)].get('PR', 0), 1
+    #             )
+    #             print(f"[Force PR] {station_name} on {day.date.strftime('%Y-%m-%d')}")
     return demand

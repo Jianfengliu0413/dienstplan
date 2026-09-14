@@ -37,34 +37,34 @@ INACTIVITY_TIMEOUT_SECONDS = 300 # in seconds
 #     # Option 2: hardcoded fallback (change these)
 #     return username == "admin" and password == "password" 
 
-# --- Authentication: only a city name is required ---
-def check_city(city):
-    # Case-insensitive, strip extra spaces
-    if 'ü' in city.strip().lower():
-        return None
-    return city.strip().lower() == "tuebingen"
+# # --- Authentication: only a city name is required ---
+# def check_city(city):
+#     # Case-insensitive, strip extra spaces
+#     if 'ü' in city.strip().lower():
+#         return None
+#     return city.strip().lower() == "tuebingen"
 
-# --- Authentication check ---
-if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
-# --- add a timer --- 
-if 'last_activity' in st.session_state:
-    elapsed= (datetime.now()-st.session_state['last_activity']).total_seconds()
-    if elapsed > INACTIVITY_TIMEOUT_SECONDS: # in seonds
-        if os.path.exists(RULES_FILE):
-            try:
-                os.unlink(RULES_FILE)
-            except:
-                pass
-        for path_key in ['template_path', 'wishes_path']:
-            if st.session_state.get(path_key) and os.path.exists(st.session_state[path_key]):
-                try:
-                    os.unlink(st.session_state[path_key])
-                except:
-                    pass 
-        st.session_state.clear()
-        st.rerun()
-st.session_state['last_activity']= datetime.now()
+# # --- Authentication check ---
+# if "authenticated" not in st.session_state:
+#     st.session_state["authenticated"] = False
+# # --- add a timer --- 
+# if 'last_activity' in st.session_state:
+#     elapsed= (datetime.now()-st.session_state['last_activity']).total_seconds()
+#     if elapsed > INACTIVITY_TIMEOUT_SECONDS: # in seonds
+#         if os.path.exists(RULES_FILE):
+#             try:
+#                 os.unlink(RULES_FILE)
+#             except:
+#                 pass
+#         for path_key in ['template_path', 'wishes_path']:
+#             if st.session_state.get(path_key) and os.path.exists(st.session_state[path_key]):
+#                 try:
+#                     os.unlink(st.session_state[path_key])
+#                 except:
+#                     pass 
+#         st.session_state.clear()
+#         st.rerun()
+# st.session_state['last_activity']= datetime.now()
 # --- Custom CSS ---
 st.markdown("""
 
@@ -272,16 +272,16 @@ st.markdown("""
 #         st.markdown('</div>', unsafe_allow_html=True)
 #     st.stop()  # Prevent any further rendering if not authenticated
 
-# # --- Session state ---
-# if 'initialized' not in st.session_state:
-#     st.session_state.clear()
-#     st.session_state['initialized'] = True
-#     st.session_state['rules_file_path'] = RULES_FILE
-#     st.session_state['template_path'] = None
-#     st.session_state['wishes_path'] = None
-#     st.session_state['config_loaded'] = False
-#     st.session_state['output_file'] = None
-#     st.session_state['file_hashes'] = {}
+# --- Session state ---
+if 'initialized' not in st.session_state:
+    st.session_state.clear()
+    st.session_state['initialized'] = True
+    st.session_state['rules_file_path'] = RULES_FILE
+    st.session_state['template_path'] = None
+    st.session_state['wishes_path'] = None
+    st.session_state['config_loaded'] = False
+    st.session_state['output_file'] = None
+    st.session_state['file_hashes'] = {}
 
 # --- Sidebar ---
 with st.sidebar:
@@ -341,7 +341,7 @@ with st.sidebar:
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         
-        st.session_state["authenticated"] = False
+        # st.session_state["authenticated"] = False
         st.rerun()
 
 # --- Main content ---

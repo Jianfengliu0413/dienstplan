@@ -245,43 +245,43 @@ st.markdown("""
 
 
 
-# --- LOGIN PAGE (shown only if not authenticated) ---
-if not st.session_state["authenticated"]:
-    st.markdown("""
-    <div style="text-align: center; margin-bottom: 1rem;">
-        <h3 style="color: #1a1a2e; font-weight: 300; font-size: 1.8rem; margin: 0.2rem 0;">IM2 Dienstplan</h3>
-        <hr style="width: 200px; border: 1px solid #2E86C1; margin: 0rem auto;">
-        <p style="color: #6c757d;">Please log in to continue</p>
-    </div>
-    """, unsafe_allow_html=True)
+# # --- LOGIN PAGE (shown only if not authenticated) ---
+# if not st.session_state["authenticated"]:
+#     st.markdown("""
+#     <div style="text-align: center; margin-bottom: 1rem;">
+#         <h3 style="color: #1a1a2e; font-weight: 300; font-size: 1.8rem; margin: 0.2rem 0;">IM2 Dienstplan</h3>
+#         <hr style="width: 200px; border: 1px solid #2E86C1; margin: 0rem auto;">
+#         <p style="color: #6c757d;">Please log in to continue</p>
+#     </div>
+#     """, unsafe_allow_html=True)
 
-    with st.container():
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        with st.form("login_form"):
-            city = st.text_input("Which city are you?", placeholder="e.g. Munich")
-            submitted = st.form_submit_button("Log in")
-            if submitted:
-                if check_city(city):
-                    st.session_state["authenticated"] = True
-                    st.session_state["last_activity"] = datetime.now()
-                    st.rerun()
-                elif check_city(city) is None:
-                    st.error("Invalid city – please type it in english. without ‘ü’")
-                else:
-                    st.error("Invalid city – please try again")
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()  # Prevent any further rendering if not authenticated
+#     with st.container():
+#         st.markdown('<div class="login-container">', unsafe_allow_html=True)
+#         with st.form("login_form"):
+#             city = st.text_input("Which city are you?", placeholder="e.g. Munich")
+#             submitted = st.form_submit_button("Log in")
+#             if submitted:
+#                 if check_city(city):
+#                     st.session_state["authenticated"] = True
+#                     st.session_state["last_activity"] = datetime.now()
+#                     st.rerun()
+#                 elif check_city(city) is None:
+#                     st.error("Invalid city – please type it in english. without ‘ü’")
+#                 else:
+#                     st.error("Invalid city – please try again")
+#         st.markdown('</div>', unsafe_allow_html=True)
+#     st.stop()  # Prevent any further rendering if not authenticated
 
-# --- Session state ---
-if 'initialized' not in st.session_state:
-    st.session_state.clear()
-    st.session_state['initialized'] = True
-    st.session_state['rules_file_path'] = RULES_FILE
-    st.session_state['template_path'] = None
-    st.session_state['wishes_path'] = None
-    st.session_state['config_loaded'] = False
-    st.session_state['output_file'] = None
-    st.session_state['file_hashes'] = {}
+# # --- Session state ---
+# if 'initialized' not in st.session_state:
+#     st.session_state.clear()
+#     st.session_state['initialized'] = True
+#     st.session_state['rules_file_path'] = RULES_FILE
+#     st.session_state['template_path'] = None
+#     st.session_state['wishes_path'] = None
+#     st.session_state['config_loaded'] = False
+#     st.session_state['output_file'] = None
+#     st.session_state['file_hashes'] = {}
 
 # --- Sidebar ---
 with st.sidebar:

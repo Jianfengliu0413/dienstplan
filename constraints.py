@@ -68,36 +68,8 @@ def add_hard_constraints(
     # 3. Station match
     for i, (day_idx, station, abbr) in enumerate(duties):
         if i in fixed_duty_indices: continue
-        # if station == GLOBAL_STATION and abbr in ['SD', 'HD', 'NAZ']:
-        #     # 主站优先
-        #     main_candidates = []
-        #     for j, doc_name in enumerate(doctors):
-        #         if schedule.doctors[doc_name].station not in MAIN_STATIONS:
-        #             continue
-        #         if (doc_name, day_idx) in schedule.unavailable:
-        #             continue
-        #         if abbr == 'NAZ' and not schedule.doctors[doc_name].allow_naz:
-        #             continue
-        #         main_candidates.append(j)
-        #     if main_candidates:
-        #         allowed = main_candidates
-        #     else:
-        #         # fallback: 所有符合条件的医生
-        #         fallback = []
-        #         for j, doc_name in enumerate(doctors):
-        #             if (doc_name, day_idx) in schedule.unavailable:
-        #                 continue
-        #             if abbr == 'NAZ' and not schedule.doctors[doc_name].allow_naz:
-        #                 continue
-        #             fallback.append(j)
-        #         if fallback:
-        #             allowed = fallback
-        #         else:
-        #             allowed = list(range(num_doctors))
-        #         print(f"Global {abbr} on day {day_idx}: no available main‑station doctors – allowing all")
-        #     model_cp.Add(sum(x_vars[(i, j)] for j in allowed) == 1)
-
         if station == GLOBAL_STATION and abbr in ['SD', 'HD', 'NAZ']:
+            # 主站优先
             main_candidates = []
             for j, doc_name in enumerate(doctors):
                 if schedule.doctors[doc_name].station not in MAIN_STATIONS:
@@ -107,18 +79,46 @@ def add_hard_constraints(
                 if abbr == 'NAZ' and not schedule.doctors[doc_name].allow_naz:
                     continue
                 main_candidates.append(j)
-            # NOTE: do not hard-restrict to main_candidates — allow all eligible doctors
-            # and let the soft penalties reward main-station doctors.
-            allowed = []
-            for j, doc_name in enumerate(doctors):
-                if (doc_name, day_idx) in schedule.unavailable:
-                    continue
-                if abbr == 'NAZ' and not schedule.doctors[doc_name].allow_naz:
-                    continue
-                allowed.append(j)
-            if not allowed:
-                allowed = list(range(num_doctors))
+            if main_candidates:
+                allowed = main_candidates
+            else:
+                # fallback: 所有符合条件的医生
+                fallback = []
+                for j, doc_name in enumerate(doctors):
+                    if (doc_name, day_idx) in schedule.unavailable:
+                        continue
+                    if abbr == 'NAZ' and not schedule.doctors[doc_name].allow_naz:
+                        continue
+                    fallback.append(j)
+                if fallback:
+                    allowed = fallback
+                else:
+                    allowed = list(range(num_doctors))
+                print(f"Global {abbr} on day {day_idx}: no available main‑station doctors – allowing all")
             model_cp.Add(sum(x_vars[(i, j)] for j in allowed) == 1)
+
+    # if station == GLOBAL_STATION and abbr in ['SD', 'HD', 'NAZ']:
+    #     main_candidates = []
+    #     for j, doc_name in enumerate(doctors):
+    #         if schedule.doctors[doc_name].station not in MAIN_STATIONS:
+    #             continue
+    #         if (doc_name, day_idx) in schedule.unavailable:
+    #             continue
+    #         if abbr == 'NAZ' and not schedule.doctors[doc_name].allow_naz:
+    #             continue
+    #         main_candidates.append(j)
+    #     # NOTE: do not hard-restrict to main_candidates — allow all eligible doctors
+    #     # and let the soft penalties reward main-station doctors.
+    #     allowed = []
+    #     for j, doc_name in enumerate(doctors):
+    #         if (doc_name, day_idx) in schedule.unavailable:
+    #             continue
+    #         if abbr == 'NAZ' and not schedule.doctors[doc_name].allow_naz:
+    #             continue
+    #         allowed.append(j)
+    #     if not allowed:
+    #         allowed = list(range(num_doctors))
+    #     model_cp.Add(sum(x_vars[(i, j)] for j in allowed) == 1)
 
 
         else:

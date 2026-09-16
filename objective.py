@@ -75,22 +75,24 @@ def add_soft_constraints(
             penalties.append(balance_weight * pos_dev)
             penalties.append(balance_weight * neg_dev)
     
-    # 4. Weekend balance (equal distribution)
+    # 4. Weekend balance (equal distribution) 
     weekend_weight = int(penalties_cfg.get('WeekendBalance', 15))
-    if weekend_weight != 0:
+    if weekend_weight != 0 and num_doctors > 0:
         weekend_days = [idx for idx, day in enumerate(schedule.days) if day.is_weekend]
         weekend_duty_indices = [i for i, (d, _, _) in enumerate(duties) if d in weekend_days]
         if weekend_duty_indices:
-            avg_weekend = len(weekend_duty_indices) / num_doctors if num_doctors > 0 else 0
+            K = len(weekend_duty_indices)
+            floor_val = K // num_doctors
+            ceil_val = (K + num_doctors - 1) // num_doctors
             for j in range(num_doctors):
-                weekend_assigned = model_cp.NewIntVar(0, len(weekend_duty_indices), f'weekend_{j}')
+                weekend_assigned = model_cp.NewIntVar(0, K, f'weekend_{j}')
                 model_cp.Add(weekend_assigned == sum(x_vars[(i, j)] for i in weekend_duty_indices))
-                pos_dev = model_cp.NewIntVar(0, len(weekend_duty_indices), f'wpos_{j}')
-                neg_dev = model_cp.NewIntVar(0, len(weekend_duty_indices), f'wneg_{j}')
-                model_cp.Add(weekend_assigned - int(avg_weekend) == pos_dev - neg_dev)
-                penalties.append(weekend_weight * pos_dev)
-                penalties.append(weekend_weight * neg_dev)
-
+                over = model_cp.NewIntVar(0, K, f'w_over_{j}')
+                under = model_cp.NewIntVar(0, K, f'w_under_{j}')
+                model_cp.Add(weekend_assigned - ceil_val <= over)
+                model_cp.Add(floor_val - weekend_assigned <= under)
+                penalties.append(weekend_weight * over)
+                penalties.append(weekend_weight * under)
     # 5. Weekend pairing and home‑station bonus for PR
     weekend_pairing_reward = int(penalties_cfg.get('WeekendPairingReward', 30))
     weekend_single_penalty = int(penalties_cfg.get('WeekendSinglePenalty', 20))
@@ -128,21 +130,23 @@ def add_soft_constraints(
                     penalties.append(-weekend_home_bonus * x_vars[(sat_idx, j)])
                     penalties.append(-weekend_home_bonus * x_vars[(sun_idx, j)])
 
-    # 6. Balance KM duties
+    # 6. Balance KM duties 
     km_weight = int(penalties_cfg.get('KMBalance', 30))
-    if km_weight != 0:
+    if km_weight != 0 and num_doctors > 0:
         km_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'KM']
         if km_indices:
-            avg_km = len(km_indices) / num_doctors if num_doctors > 0 else 0
+            K = len(km_indices)
+            floor_val = K // num_doctors
+            ceil_val = (K + num_doctors - 1) // num_doctors
             for j in range(num_doctors):
-                km_assigned = model_cp.NewIntVar(0, len(km_indices), f'km_{j}')
+                km_assigned = model_cp.NewIntVar(0, K, f'km_{j}')
                 model_cp.Add(km_assigned == sum(x_vars[(i, j)] for i in km_indices))
-                pos_dev = model_cp.NewIntVar(0, len(km_indices), f'km_pos_{j}')
-                neg_dev = model_cp.NewIntVar(0, len(km_indices), f'km_neg_{j}')
-                model_cp.Add(km_assigned - int(avg_km) == pos_dev - neg_dev)
-                penalties.append(km_weight * pos_dev)
-                penalties.append(km_weight * neg_dev)
-
+                over = model_cp.NewIntVar(0, K, f'km_over_{j}')
+                under = model_cp.NewIntVar(0, K, f'km_under_{j}')
+                model_cp.Add(km_assigned - ceil_val <= over)
+                model_cp.Add(floor_val - km_assigned <= under)
+                penalties.append(km_weight * over)
+                penalties.append(km_weight * under)
     # 7. Cross‑station penalty for ZD/SD/HD/NAZ (encourage same‑station coverage)
     cross_weight = int(penalties_cfg.get('CrossStation', 150))
     if cross_weight != 0:
@@ -151,36 +155,43 @@ def add_soft_constraints(
                 for j, doc_name in enumerate(doctors):
                     if schedule.doctors[doc_name].station != station:
                         penalties.append(cross_weight * x_vars[(i, j)])
+ 
 
-    # 8. SD balance
+    # 8. SD balance — even distribution, no truncation
     sd_weight = int(penalties_cfg.get('SDBalance', 20))
-    if sd_weight != 0:
+    if sd_weight != 0 and num_doctors > 0:
         sd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'SD']
         if sd_indices:
-            avg_sd = len(sd_indices) / num_doctors if num_doctors > 0 else 0
+            K = len(sd_indices)
+            floor_val = K // num_doctors
+            ceil_val = (K + num_doctors - 1) // num_doctors
             for j in range(num_doctors):
-                sd_assigned = model_cp.NewIntVar(0, len(sd_indices), f'sd_{j}')
+                sd_assigned = model_cp.NewIntVar(0, K, f'sd_{j}')
                 model_cp.Add(sd_assigned == sum(x_vars[(i, j)] for i in sd_indices))
-                pos_dev = model_cp.NewIntVar(0, len(sd_indices), f'sd_pos_{j}')
-                neg_dev = model_cp.NewIntVar(0, len(sd_indices), f'sd_neg_{j}')
-                model_cp.Add(sd_assigned - int(avg_sd) == pos_dev - neg_dev)
-                penalties.append(sd_weight * pos_dev)
-                penalties.append(sd_weight * neg_dev)
-    # ZD balance
+                over = model_cp.NewIntVar(0, K, f'sd_over_{j}')
+                under = model_cp.NewIntVar(0, K, f'sd_under_{j}')
+                model_cp.Add(sd_assigned - ceil_val <= over)
+                model_cp.Add(floor_val - sd_assigned <= under)
+                penalties.append(sd_weight * over)
+                penalties.append(sd_weight * under)
+ 
+    # ZD balance — even distribution, no truncation
     zd_weight = int(penalties_cfg.get('ZDBalance', 0))
-    if zd_weight != 0:
+    if zd_weight != 0 and num_doctors > 0:
         zd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'ZD']
         if zd_indices:
-            avg_zd = len(zd_indices) / num_doctors if num_doctors > 0 else 0
+            K = len(zd_indices)
+            floor_val = K // num_doctors
+            ceil_val = (K + num_doctors - 1) // num_doctors
             for j in range(num_doctors):
-                zd_assigned = model_cp.NewIntVar(0, len(zd_indices), f'zd_{j}')
+                zd_assigned = model_cp.NewIntVar(0, K, f'zd_{j}')
                 model_cp.Add(zd_assigned == sum(x_vars[(i, j)] for i in zd_indices))
-                pos_dev = model_cp.NewIntVar(0, len(zd_indices), f'zd_pos_{j}')
-                neg_dev = model_cp.NewIntVar(0, len(zd_indices), f'zd_neg_{j}')
-                model_cp.Add(zd_assigned - int(avg_zd) == pos_dev - neg_dev)
-                penalties.append(zd_weight * pos_dev)
-                penalties.append(zd_weight * neg_dev)
-
+                over = model_cp.NewIntVar(0, K, f'zd_over_{j}')
+                under = model_cp.NewIntVar(0, K, f'zd_under_{j}')
+                model_cp.Add(zd_assigned - ceil_val <= over)
+                model_cp.Add(floor_val - zd_assigned <= under)
+                penalties.append(zd_weight * over)
+                penalties.append(zd_weight * under)
     # 9. Consecutive ZD reward
     zd_consecutive_reward = int(penalties_cfg.get('ZDConsecutiveReward', 50))
     zd_duty_map = {}
@@ -260,19 +271,24 @@ def add_soft_constraints(
                 for j, doc_name in enumerate(doctors):
                     if not schedule.doctors[doc_name].allow_92_kmt:
                         penalties.append(penalty_92_kmt * x_vars[(i, j)])
-    # 14. PR balance (weekend PR duties only)
+
+    # 14. PR balance (weekend PR duties only) 
     pr_balance_weight = int(penalties_cfg.get('PRBalance', 0))
-    if pr_balance_weight != 0:
-        pr_indices = [i for i, (day_idx, station, abbr) in enumerate(duties)
-                      if abbr == 'PR' and schedule.days[day_idx].is_weekend]
+    if pr_balance_weight != 0 and num_doctors > 0:
+        pr_indices = [i for i, (day_idx, _, abbr) in enumerate(duties)
+                    if abbr == 'PR' and schedule.days[day_idx].is_weekend]
         if pr_indices:
-            avg_pr = len(pr_indices) / num_doctors if num_doctors > 0 else 0
+            K = len(pr_indices)
+            floor_val = K // num_doctors
+            ceil_val = (K + num_doctors - 1) // num_doctors
             for j in range(num_doctors):
-                pr_assigned = model_cp.NewIntVar(0, len(pr_indices), f'pr_{j}')
+                pr_assigned = model_cp.NewIntVar(0, K, f'pr_{j}')
                 model_cp.Add(pr_assigned == sum(x_vars[(i, j)] for i in pr_indices))
-                pos_dev = model_cp.NewIntVar(0, len(pr_indices), f'pr_pos_{j}')
-                neg_dev = model_cp.NewIntVar(0, len(pr_indices), f'pr_neg_{j}')
-                model_cp.Add(pr_assigned - int(avg_pr) == pos_dev - neg_dev)
-                penalties.append(pr_balance_weight * pos_dev)
-                penalties.append(pr_balance_weight * neg_dev)
+                over = model_cp.NewIntVar(0, K, f'pr_over_{j}')
+                under = model_cp.NewIntVar(0, K, f'pr_under_{j}')
+                model_cp.Add(pr_assigned - ceil_val <= over)
+                model_cp.Add(floor_val - pr_assigned <= under)
+                penalties.append(pr_balance_weight * over)
+                penalties.append(pr_balance_weight * under)
+
     return penalties

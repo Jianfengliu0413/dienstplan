@@ -148,6 +148,14 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
     duty_map = {}
     for i, (day_idx, station, abbr) in enumerate(duties):
         duty_map[(day_idx, station, abbr)] = i
+
+    # identify which duties are fixed (forced to 1) so caps exclude them
+    fixed_duty_indices = set()
+    for doc_name, day_idx, station, duty_abbr in schedule.fixed_assignments:
+        key = (day_idx, station, duty_abbr)
+        if key in duty_map:
+            fixed_duty_indices.add(duty_map[key])
+
     for doc_name, day_idx, station, duty_abbr in schedule.fixed_assignments:
         if duty_abbr == 'NAZ':
             if not schedule.doctors[doc_name].allow_naz:
@@ -319,48 +327,58 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
                         model_cp.Add(x[(i, j)] == 0)
 
     # 7. Max total weekend duties per doctor
-    max_weekend_per_doctor = int(general.get('MaxWeekendPerDoctor', 1))
+    max_weekend_per_doctor = int(general.get('MaxWeekendPerDoctor', 1)) 
+                model_cp.Add(sum(x[(i, j)] for i in weekend_indices) <= max_weekend_per_doctor)
     if constraints_cfg.get('MaxOneWeekendPerDoctor', 'Yes') == 'Yes':
         for j in range(num_doctors):
-            weekend_indices = [i for i, (day_idx, _, _) in enumerate(duties) if schedule.days[day_idx].is_weekend]
+            weekend_indices = [
+                i for i, (day_idx, _, _) in enumerate(duties)
+                if schedule.days[day_idx].is_weekend and i not in fixed_duty_indices
+            ]
             if weekend_indices:
                 model_cp.Add(sum(x[(i, j)] for i in weekend_indices) <= max_weekend_per_doctor)
-
     # 8. Max SD per doctor
-    max_sd_per_doctor = int(general.get('MaxSDPerDoctor', 4))
+    max_sd_per_doctor = int(general.get('MaxSDPerDoctor', 4)) 
     if constraints_cfg.get('MaxSD', 'Yes') == 'Yes':
         for j in range(num_doctors):
-            sd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'SD']
+            sd_indices = [
+                i for i, (_, _, abbr) in enumerate(duties)
+                if abbr == 'SD' and i not in fixed_duty_indices
+            ]
             if sd_indices:
                 model_cp.Add(sum(x[(i, j)] for i in sd_indices) <= max_sd_per_doctor)
-
     # 9. Max NAZ per doctor
-    max_naz = int(general.get('MaxNAZPerDoctor', 2))
+    max_naz = int(general.get('MaxNAZPerDoctor', 2)) 
     if constraints_cfg.get('MaxNAZ', 'Yes') == 'Yes':
         for j in range(num_doctors):
-            naz_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'NAZ']
+            naz_indices = [
+                i for i, (_, _, abbr) in enumerate(duties)
+                if abbr == 'NAZ' and i not in fixed_duty_indices
+            ]
             if naz_indices:
                 model_cp.Add(sum(x[(i, j)] for i in naz_indices) <= max_naz)
-
     # 10. Max PR on weekends per doctor
-    max_pr_weekend = int(general.get('MaxWeekendPRPerDoctor', 1))
+    max_pr_weekend = int(general.get('MaxWeekendPRPerDoctor', 1)) 
     if constraints_cfg.get('MaxWeekendPR', 'Yes') == 'Yes':
         for j in range(num_doctors):
             pr_weekend_indices = [
                 i for i, (day_idx, station, abbr) in enumerate(duties)
-                if abbr == 'PR' and schedule.days[day_idx].is_weekend
+                if abbr == 'PR'
+                and schedule.days[day_idx].is_weekend
+                and i not in fixed_duty_indices
             ]
             if pr_weekend_indices:
                 model_cp.Add(sum(x[(i, j)] for i in pr_weekend_indices) <= max_pr_weekend)
-
     # 11. Max house shifts (HD) per doctor
-    max_hd_per_doctor = int(general.get('MaxHouseShifts', 2))
+    max_hd_per_doctor = int(general.get('MaxHouseShifts', 2)) 
     if constraints_cfg.get('MaxHouseShifts', 'Yes') == 'Yes':
         for j in range(num_doctors):
-            hd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'HD']
+            hd_indices = [
+                i for i, (_, _, abbr) in enumerate(duties)
+                if abbr == 'HD' and i not in fixed_duty_indices
+            ]
             if hd_indices:
                 model_cp.Add(sum(x[(i, j)] for i in hd_indices) <= max_hd_per_doctor)
-
     # 12. 92 KMT weekend PR restriction
     allowed_92_indices = [
         j for j, doc_name in enumerate(doctors)
@@ -385,7 +403,7 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
             else:
                 model_cp.Add(0 == 1)
 
-    # 14. Max consecutive days
+    # 14. Max consecutive days 
     if constraints_cfg.get('MaxConsecutive', 'Yes') == 'Yes':
         max_consec = int(general.get('MaxConsecutiveWorkDays', 6))
         if max_consec > 0:
@@ -395,15 +413,16 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
                     duties_this_day = [i for i, (d, _, _) in enumerate(duties) if d == day_idx]
                     if duties_this_day:
                         work[(j, day_idx)] = model_cp.NewBoolVar(f'work_{j}_{day_idx}')
-                        model_cp.Add(work[(j, day_idx)] == sum(x[(i, j)] for i in duties_this_day))
+                        model_cp.Add(work[(j, day_idx)] == sum(
+                            x[(i, j)] for i in duties_this_day if i not in fixed_duty_indices
+                        ))
                     else:
                         work[(j, day_idx)] = model_cp.NewConstant(0)
             for j in range(num_doctors):
                 for start in range(len(schedule.days) - max_consec):
                     window = [work[(j, day)] for day in range(start, start + max_consec + 1)]
                     model_cp.Add(sum(window) <= max_consec)
-
-    # 15. Max duties per week
+    # 15. Max duties per week 
     if constraints_cfg.get('MaxPerWeek', 'Yes') == 'Yes':
         max_week = int(general.get('MaxDutiesPerWeek', 5))
         if max_week > 0:
@@ -412,17 +431,23 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
                 week_days[day.date.isocalendar().week].append(day_idx)
             for week, day_indices in week_days.items():
                 for j in range(num_doctors):
-                    duty_indices_in_week = [i for i, (d, _, _) in enumerate(duties) if d in day_indices]
+                    duty_indices_in_week = [
+                        i for i, (d, _, _) in enumerate(duties)
+                        if d in day_indices and i not in fixed_duty_indices
+                    ]
                     if duty_indices_in_week:
                         model_cp.Add(sum(x[(i, j)] for i in duty_indices_in_week) <= max_week)
-    # Main station doctors: max 1 weekend duty (any type)
+
+    # Main station doctors: max 1 weekend duty (any type) 
     if constraints_cfg.get('MainDoctorMaxOneWeekend', 'Yes') == 'Yes':
         for j, doc_name in enumerate(doctors):
             if schedule.doctors[doc_name].category == 'main':
-                weekend_indices = [i for i, (day_idx, _, _) in enumerate(duties) if schedule.days[day_idx].is_weekend]
+                weekend_indices = [
+                    i for i, (day_idx, _, _) in enumerate(duties)
+                    if schedule.days[day_idx].is_weekend and i not in fixed_duty_indices
+                ]
                 if weekend_indices:
                     model_cp.Add(sum(x[(i, j)] for i in weekend_indices) <= 1)
-
     # Add soft constraints (objective)
     penalties = add_soft_constraints(model_cp, schedule, config, x, duties, doctors, demand, duty_hours, initial_hours)
     model_cp.Minimize(sum(penalties))

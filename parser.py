@@ -735,6 +735,11 @@ def ensure_doctor_active(doc_name: str, model: ScheduleModel) -> bool:
     """Reactivate inactive doctor if they have a fixed wish, even if excluded."""
     if doc_name in model.doctors:
         return True
+
+    # Do NOT reactivate excluded doctors, even if they have a fixed wish
+    if hasattr(model, 'excluded_doctors') and doc_name in model.excluded_doctors:
+        print(f"[SKIP] {doc_name} is excluded and will not be reactivated.")
+        return False
     # Check if doctor is in inactive list (including excluded ones)
     if hasattr(model, '_inactive_doctors') and doc_name in model._inactive_doctors:
         info = model._inactive_doctors[doc_name]

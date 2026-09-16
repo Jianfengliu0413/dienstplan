@@ -589,9 +589,10 @@ def auto_relax_and_solve(schedule, config, duties, doctors, demand, duty_hours, 
     # ---- Stage 8‑11: disable other constraints (keep caps as they are) ----
     disable_order = [
         ['MaxOneWeekendPerDoctor'],                     # stage8
-        ['MaxHouseShifts', 'MaxSD', 'MaxNAZ'],         # stage9
+        ['MaxHouseShifts',  'MaxNAZ'],         # stage9
         ['WeekendAvailability', 'WeekendOnlyForSkilled'], # stage10
         ['WeekendOnlyFullTime', 'MaxConsecutive', 'MaxPerWeek'], # stage11
+        ['MaxSD'], # only disable MaxSD much later if really needed
     ]
     for idx, dlist in enumerate(disable_order, start=8):
         stages.append({

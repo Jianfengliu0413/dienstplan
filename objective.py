@@ -166,6 +166,20 @@ def add_soft_constraints(
                 model_cp.Add(sd_assigned - int(avg_sd) == pos_dev - neg_dev)
                 penalties.append(sd_weight * pos_dev)
                 penalties.append(sd_weight * neg_dev)
+    # ZD balance
+    zd_weight = int(penalties_cfg.get('ZDBalance', 0))
+    if zd_weight != 0:
+        zd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'ZD']
+        if zd_indices:
+            avg_zd = len(zd_indices) / num_doctors if num_doctors > 0 else 0
+            for j in range(num_doctors):
+                zd_assigned = model_cp.NewIntVar(0, len(zd_indices), f'zd_{j}')
+                model_cp.Add(zd_assigned == sum(x_vars[(i, j)] for i in zd_indices))
+                pos_dev = model_cp.NewIntVar(0, len(zd_indices), f'zd_pos_{j}')
+                neg_dev = model_cp.NewIntVar(0, len(zd_indices), f'zd_neg_{j}')
+                model_cp.Add(zd_assigned - int(avg_zd) == pos_dev - neg_dev)
+                penalties.append(zd_weight * pos_dev)
+                penalties.append(zd_weight * neg_dev)
 
     # 9. Consecutive ZD reward
     zd_consecutive_reward = int(penalties_cfg.get('ZDConsecutiveReward', 50))

@@ -410,6 +410,42 @@ def add_hard_constraints(
         for i in range(num_duties):
             if i not in fixed_duties_for_this_doctor:
                 model_cp.Add(x_vars[(i, j)] == 0)
+
+    # 21 Weekend PR pairing: same doctor for Sat + Sun at the same station, if possible
+    weekend_pr_groups = defaultdict(list)
+    for i, (day_idx, station, abbr) in enumerate(duties):
+        if abbr == 'PR' and schedule.days[day_idx].is_weekend:
+            week_num = schedule.days[day_idx].date.isocalendar().week
+            weekend_pr_groups[(week_num, station)].append(i)
+
+    for (week_num, station), idxs in weekend_pr_groups.items():
+        if len(idxs) != 2:
+            continue
+
+        # Sort so idx0 = Saturday, idx1 = Sunday
+        idxs_sorted = sorted(idxs, key=lambda i: duties[i][0])
+        sat_i, sun_i = idxs_sorted[0], idxs_sorted[1]
+        sat_day = duties[sat_i][0]
+        sun_day = duties[sun_i][0]
+
+        # Check if at least one doctor can do both days
+        available_both = []
+        for j, doc_name in enumerate(doctors):
+            doc = schedule.doctors[doc_name]
+            if (doc_name, sat_day) in schedule.unavailable:
+                continue
+            if (doc_name, sun_day) in schedule.unavailable:
+                continue
+            if not doc.weekend_available:
+                continue
+            if 'PR' not in doc.skills:
+                continue
+            available_both.append(j)
+
+        if available_both:
+            for j in range(num_doctors):
+                model_cp.Add(x_vars[(sat_i, j)] == x_vars[(sun_i, j)])
+
 def get_allowed_doctors_for_weekend_pr(day_idx, station, doctors, schedule):
     """
     Return list of doctor indices in priority order:

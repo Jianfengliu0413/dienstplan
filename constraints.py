@@ -309,6 +309,8 @@ def add_hard_constraints(
                         i for i, (d, _, _) in enumerate(duties)
                         if d in day_indices and i not in fixed_duty_indices
                     ]
+                    if duty_indices_in_week:
+                        model_cp.Add(sum(x_vars[(i, j)] for i in duty_indices_in_week) <= max_week)
     # # 13. Special: Weekend PR at 92 KMT only for doctors with allow_92_kmt=True ---
     # allowed_92_indices = [
     #     j for j, doc_name in enumerate(doctors)
@@ -370,15 +372,8 @@ def add_hard_constraints(
             ]
             if hd_indices:
                 model_cp.Add(sum(x_vars[(i, j)] for i in hd_indices) <= max_hd_per_doctor)
-    # --- 17. Max SD per doctor (to avoid concentration) ---
-    max_sd_per_doctor = int(general.get('MaxSDPerDoctor', 4))   # default 4
-    if constraints_cfg.get('MaxSD', 'Yes') == 'Yes':
-        for j in range(num_doctors):
-            sd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'SD']
-            if sd_indices:
-                model_cp.Add(sum(x_vars[(i, j)] for i in sd_indices) <= max_sd_per_doctor)
-
-    # --- Max ZD per doctor --- 
+    # --- 17. Max SD per doctor ---
+    max_sd_per_doctor = int(general.get('MaxSDPerDoctor', 4))
     if constraints_cfg.get('MaxSD', 'Yes') == 'Yes':
         for j in range(num_doctors):
             sd_indices = [
@@ -387,6 +382,18 @@ def add_hard_constraints(
             ]
             if sd_indices:
                 model_cp.Add(sum(x_vars[(i, j)] for i in sd_indices) <= max_sd_per_doctor)
+
+    # --- Max ZD per doctor ---
+    max_zd_per_doctor = int(general.get('MaxZDPerDoctor', 5))
+    if constraints_cfg.get('MaxZD', 'Yes') == 'Yes':
+        for j in range(num_doctors):
+            zd_indices = [
+                i for i, (_, _, abbr) in enumerate(duties)
+                if abbr == 'ZD' and i not in fixed_duty_indices
+            ]
+            if zd_indices:
+                model_cp.Add(sum(x_vars[(i, j)] for i in zd_indices) <= max_zd_per_doctor)
+
     # 18. No weekend duty if bridge day
     if constraints_cfg.get('BridgeDay', 'No') == 'Yes':
         for i, (day_idx, station, abbr) in enumerate(duties):

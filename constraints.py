@@ -368,6 +368,15 @@ def add_hard_constraints(
             sd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'SD']
             if sd_indices:
                 model_cp.Add(sum(x_vars[(i, j)] for i in sd_indices) <= max_sd_per_doctor)
+
+    # --- Max ZD per doctor ---
+    max_zd_per_doctor = int(general.get('MaxZDPerDoctor', 5))   # default 5
+    if constraints_cfg.get('MaxZD', 'Yes') == 'Yes':
+        for j in range(num_doctors):
+            zd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'ZD']
+            if zd_indices:
+                model_cp.Add(sum(x_vars[(i, j)] for i in zd_indices) <= max_zd_per_doctor)
+
     # 18. No weekend duty if bridge day
     if constraints_cfg.get('BridgeDay', 'No') == 'Yes':
         for i, (day_idx, station, abbr) in enumerate(duties):

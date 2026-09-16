@@ -409,276 +409,397 @@ except Exception as e:
 # tab1, tab2, tab3 = st.tabs(["Run", "Edit", "Downloads"])
 tab1,tab3  = st.tabs(["Run",'Downloads'])
 
-# -------- TAB 1: RUN --------
-with tab1:
-    st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-    st.markdown("### Generate Schedule")
-    
-    # Use the latest config from session state
-    current_config = st.session_state.get('config', config)
-    
-    # --- DEBUG: Show all sheets in the current config ---
-    with st.expander("Show all sheets in current_config", expanded=False):
-        st.write("**Sheet names and first rows:**")
-        for sheet_name in sorted(current_config.keys()):
-            st.write(f"**{sheet_name}**")
-            df = current_config[sheet_name]
-            st.dataframe(df)
-     
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Doctors", len(current_config.get("Doctors", pd.DataFrame())))
-    with col2:
-        stations = current_config.get("Stations", pd.DataFrame())
-        st.metric("Stations", len(stations))
-    with col3:
-        duties = current_config.get("DutyTypes", pd.DataFrame())
-        st.metric("Duty Types", len(duties))
-    
-    output_file = st.text_input("Output filename", "Stationsplan_out.xlsx")
-
-    # if st.button("Generate Schedule", use_container_width=True):
-    #     with st.spinner("Generating schedule..."):
-    #         try:
-    #             template_path = st.session_state.get('template_path')
-    #             if template_path is None or not os.path.exists(template_path):
-    #                 st.error("Please upload a valid Template file (Stationsplan) in the sidebar.")
-    #                 st.stop()
-                
-    #             rules_file_path = RULES_FILE
-    #             st.info(f"Reading your local Rules file...")
-
-    #             settings_df = current_config.get("Settings", pd.DataFrame()).copy()
-    #             settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
-    #             settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
-    #             if st.session_state.get('wishes_path'):
-    #                 settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = st.session_state['wishes_path']
-                
-    #             with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-    #                 settings_df.to_excel(writer, sheet_name="Settings", index=False)
-    #             # # After writing Settings sheet, but before run_scheduler:
-    #             # if os.path.exists(rules_file_path):
-    #             #     # Print the content of the Stations sheet for verification
-    #             #     try:
-    #             #         debug_config = load_config(rules_file_path)
-    #             #         stations_df = debug_config.get('Stations', pd.DataFrame())
-    #             #         # st.write("Stations sheet in the file being used:")
-    #             #         # st.dataframe(stations_df)
-    #             #     except Exception as e:
-    #             #         st.warning(f"Could not read Stations sheet for debug: {e}")
-
-
-    #             # st.subheader("Debug: Stations sheet in current_config")
-    #             # st.dataframe(current_config.get('Stations', pd.DataFrame()))
-    #             wishes = st.session_state.get('wishes_path')
-
-    #             # Use the current_config dict directly to avoid file I/O issues
-    #             success, log_output = run_scheduler(template_path, output_file, None, wishes, config_dict=current_config)
-    #             if success:
-    #                 st.success("Schedule generated successfully!")
-    #                 st.session_state['output_file'] = output_file
-    #                 st.session_state['log_output'] = log_output
-    #             else:
-    #                 st.error(f"Scheduler failed. Log:\n{log_output}")
-                
-    #         except Exception as e:
-    #             st.error(f"Error: {e}")
-    #             st.code(traceback.format_exc(), language="python")
-    # st.markdown('</div>', unsafe_allow_html=True)
-
-    if st.button("Generate Schedule", use_container_width=True):
-        with st.spinner("Generating schedule..."):
-            try:
-                template_path = st.session_state.get('template_path')
-                if template_path is None or not os.path.exists(template_path):
-                    st.error("Please upload a valid Template file (Stationsplan) in the sidebar.")
-                    st.stop()
-                
-                rules_file_path = RULES_FILE
-                st.info(f"Reading your local Rules file...")
-
-                settings_df = current_config.get("Settings", pd.DataFrame()).copy()
-                settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
-                settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
-                if st.session_state.get('wishes_path'):
-                    settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = st.session_state['wishes_path']
-                
-                with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                    settings_df.to_excel(writer, sheet_name="Settings", index=False)
-
-                wishes = st.session_state.get('wishes_path')
-                if 'SpecialWeekendDays' in current_config:
-                    df = current_config['SpecialWeekendDays'].copy()
-                    if 'Date' in df.columns:
-                        df['Date'] = pd.to_datetime(df['Date']).dt.date.astype(str)
-                    current_config['SpecialWeekendDays'] = df
-                # Run the scheduler and capture the log
-                success, log_output = run_scheduler(template_path, output_file, None, wishes, config_dict=current_config)
-                
-                # Always store the log in session state
-                st.session_state['log_output'] = log_output
-
-                if success:
-                    st.success("Schedule generated successfully!")
-                    st.session_state['output_file'] = output_file
-                else:
-                    st.error("Scheduler failed. See the log below for details.")
-
-                # --- Display the captured log ---
-                with st.expander("log", expanded=True):
-                    if log_output:
-                        st.code(log_output, language="text")
-                    else:
-                        st.info("No log output captured.")
-
-            except Exception as e:
-                st.error(f"Error: {e}")
-                st.code(traceback.format_exc(), language="python")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# # -------- TAB 2: EDIT --------
-# with tab2:
+# # -------- TAB 1: RUN --------
+# with tab1:
 #     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-#     st.markdown("### Parameters Editor")
-#     st.caption("Edit your configuration tables. Changes are saved to the Rules.xlsx file.")
+#     st.markdown("### Generate Schedule")
+    
+#     # Use the latest config from session state
+#     current_config = st.session_state.get('config', config)
+    
+#     # # --- DEBUG: Show all sheets in the current config ---
+#     # with st.expander("Show all sheets in current_config", expanded=False):
+#     #     st.write("**Sheet names and first rows:**")
+#     #     for sheet_name in sorted(current_config.keys()):
+#     #         st.write(f"**{sheet_name}**")
+#     #         df = current_config[sheet_name]
+#     #         st.dataframe(df)
+     
+#     col1, col2, col3 = st.columns(3)
+#     with col1:
+#         st.metric("Doctors", len(current_config.get("Doctors", pd.DataFrame())))
+#     with col2:
+#         stations = current_config.get("Stations", pd.DataFrame())
+#         st.metric("Stations", len(stations))
+#     with col3:
+#         duties = current_config.get("DutyTypes", pd.DataFrame())
+#         st.metric("Duty Types", len(duties))
+    
+#     output_file = st.text_input("Output filename", "Stationsplan_out.xlsx")
 
-#     all_sheets = list(current_config.keys())
-#     if not all_sheets:
-#         st.error("No sheets found in the configuration file. Please upload a valid Rules.xlsx.")
-#         st.stop()
+#     # if st.button("Generate Schedule", use_container_width=True):
+#     #     with st.spinner("Generating schedule..."):
+#     #         try:
+#     #             template_path = st.session_state.get('template_path')
+#     #             if template_path is None or not os.path.exists(template_path):
+#     #                 st.error("Please upload a valid Template file (Stationsplan) in the sidebar.")
+#     #                 st.stop()
+                
+#     #             rules_file_path = RULES_FILE
+#     #             st.info(f"Reading your local Rules file...")
 
-#     version_key = hashlib.md5(RULES_FILE.encode()).hexdigest()
-#     if 'edit_version' not in st.session_state:
-#         st.session_state['edit_version'] = version_key
-#     elif st.session_state['edit_version'] != version_key:
-#         for key in list(st.session_state.keys()):
-#             if key.startswith('editor_'):
-#                 del st.session_state[key]
-#         st.session_state['edit_version'] = version_key
-
-#     for sheet_name in all_sheets:
-#         expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
-#         with st.expander(f"{sheet_name}", expanded=expanded):
-#             editor_key = f"editor_{sheet_name}"
-#             initial_df = current_config[sheet_name].copy().fillna("")
-#             # Ensure we have a DataFrame (convert if needed)
-#             existing = st.session_state.get(editor_key)
-#             if existing is not None and not isinstance(existing, pd.DataFrame):
-#                 # If it's a dict or something else, convert to DataFrame
-#                 try:
-#                     existing = pd.DataFrame(existing)
-#                 except:
-#                     existing = initial_df
-#             else:
-#                 existing = initial_df
-#             edited_df = st.data_editor(
-#                 existing,
-#                 key=editor_key,
-#                 use_container_width=True,
-#                 num_rows="dynamic"
-#             )
-#             # The widget updates st.session_state[editor_key] automatically
-
-#     if st.button("Save All Changes", use_container_width=True):
-#         try:
-#             file_path = RULES_FILE
-#             st.info(f"Saving to: {file_path}")
-
-#             from openpyxl import Workbook
-#             from openpyxl.utils.dataframe import dataframe_to_rows
-
-#             wb = Workbook()
-#             wb.remove(wb.active)
-
-#             for sheet_name in all_sheets:
-#                 editor_key = f"editor_{sheet_name}"
-#                 df = st.session_state.get(editor_key)
-#                 if df is None or not isinstance(df, pd.DataFrame):
-#                     df = current_config[sheet_name].copy().fillna("")
-#                 if not isinstance(df, pd.DataFrame):
-#                     df = pd.DataFrame(df)
-#                 ws = wb.create_sheet(title=sheet_name)
-#                 for r in dataframe_to_rows(df, index=False, header=True):
-#                     ws.append(r)
-
-#             wb.save(file_path)
+#     #             settings_df = current_config.get("Settings", pd.DataFrame()).copy()
+#     #             settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
+#     #             settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
+#     #             if st.session_state.get('wishes_path'):
+#     #                 settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = st.session_state['wishes_path']
+                
+#     #             with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+#     #                 settings_df.to_excel(writer, sheet_name="Settings", index=False)
+#     #             # # After writing Settings sheet, but before run_scheduler:
+#     #             # if os.path.exists(rules_file_path):
+#     #             #     # Print the content of the Stations sheet for verification
+#     #             #     try:
+#     #             #         debug_config = load_config(rules_file_path)
+#     #             #         stations_df = debug_config.get('Stations', pd.DataFrame())
+#     #             #         # st.write("Stations sheet in the file being used:")
+#     #             #         # st.dataframe(stations_df)
+#     #             #     except Exception as e:
+#     #             #         st.warning(f"Could not read Stations sheet for debug: {e}")
 
 
-#             # --- DEBUG: Show all sheets in the saved file ---
-#             debug_config = load_config(file_path)
-#             st.success(f"File saved successfully!")
-#             with st.expander("🔍 Debug: Saved file content", expanded=True):
-#                 st.write(f"**File path:** {file_path}")
-#                 for sheet_name in sorted(debug_config.keys()):
-#                     st.write(f"**{sheet_name}**")
-#                     df = debug_config[sheet_name]
-#                     st.dataframe(df.head(3))
+#     #             # st.subheader("Debug: Stations sheet in current_config")
+#     #             # st.dataframe(current_config.get('Stations', pd.DataFrame()))
+#     #             wishes = st.session_state.get('wishes_path')
 
+#     #             # Use the current_config dict directly to avoid file I/O issues
+#     #             success, log_output = run_scheduler(template_path, output_file, None, wishes, config_dict=current_config)
+#     #             if success:
+#     #                 st.success("Schedule generated successfully!")
+#     #                 st.session_state['output_file'] = output_file
+#     #                 st.session_state['log_output'] = log_output
+#     #             else:
+#     #                 st.error(f"Scheduler failed. Log:\n{log_output}")
+                
+#     #         except Exception as e:
+#     #             st.error(f"Error: {e}")
+#     #             st.code(traceback.format_exc(), language="python")
+#     # st.markdown('</div>', unsafe_allow_html=True)
 
-#             st.success("Changes saved successfully!")
+#     if st.button("Generate Schedule", use_container_width=True):
+#         with st.spinner("Generating schedule..."):
+#             try:
+#                 template_path = st.session_state.get('template_path')
+#                 if template_path is None or not os.path.exists(template_path):
+#                     st.error("Please upload a valid Template file (Stationsplan) in the sidebar.")
+#                     st.stop()
+                
+#                 rules_file_path = RULES_FILE
+#                 st.info(f"Reading your local Rules file...")
 
-#             st.session_state['config'] = load_config(file_path)
-#             for sheet_name in all_sheets:
-#                 editor_key = f"editor_{sheet_name}"
-#                 if editor_key in st.session_state:
-#                     del st.session_state[editor_key]
-#             st.rerun()
-#         except Exception as e:
-#             st.error(f"Save failed: {e}")
+#                 settings_df = current_config.get("Settings", pd.DataFrame()).copy()
+#                 settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
+#                 settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
+#                 if st.session_state.get('wishes_path'):
+#                     settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = st.session_state['wishes_path']
+                
+#                 with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+#                     settings_df.to_excel(writer, sheet_name="Settings", index=False)
 
+#                 wishes = st.session_state.get('wishes_path')
+#                 if 'SpecialWeekendDays' in current_config:
+#                     df = current_config['SpecialWeekendDays'].copy()
+#                     if 'Date' in df.columns:
+#                         df['Date'] = pd.to_datetime(df['Date']).dt.date.astype(str)
+#                     current_config['SpecialWeekendDays'] = df
+#                 # Run the scheduler and capture the log
+#                 success, log_output = run_scheduler(template_path, output_file, None, wishes, config_dict=current_config)
+                
+#                 # Always store the log in session state
+#                 st.session_state['log_output'] = log_output
+
+#                 if success:
+#                     st.success("Schedule generated successfully!")
+#                     st.session_state['output_file'] = output_file
+#                 else:
+#                     st.error("Scheduler failed. See the log below for details.")
+
+#                 # --- Display the captured log ---
+#                 with st.expander("log", expanded=True):
+#                     if log_output:
+#                         st.code(log_output, language="text")
+#                     else:
+#                         st.info("No log output captured.")
+
+#             except Exception as e:
+#                 st.error(f"Error: {e}")
+#                 st.code(traceback.format_exc(), language="python")
 #     st.markdown('</div>', unsafe_allow_html=True)
 
-# -------- TAB 3: DOWNLOADS --------
-with tab3:
-    st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-    st.markdown("### Download Files")
+# # # -------- TAB 2: EDIT --------
+# # with tab2:
+# #     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+# #     st.markdown("### Parameters Editor")
+# #     st.caption("Edit your configuration tables. Changes are saved to the Rules.xlsx file.")
+
+# #     all_sheets = list(current_config.keys())
+# #     if not all_sheets:
+# #         st.error("No sheets found in the configuration file. Please upload a valid Rules.xlsx.")
+# #         st.stop()
+
+# #     version_key = hashlib.md5(RULES_FILE.encode()).hexdigest()
+# #     if 'edit_version' not in st.session_state:
+# #         st.session_state['edit_version'] = version_key
+# #     elif st.session_state['edit_version'] != version_key:
+# #         for key in list(st.session_state.keys()):
+# #             if key.startswith('editor_'):
+# #                 del st.session_state[key]
+# #         st.session_state['edit_version'] = version_key
+
+# #     for sheet_name in all_sheets:
+# #         expanded = sheet_name in ["Settings", "Doctors", "Stations", "DutyTypes"]
+# #         with st.expander(f"{sheet_name}", expanded=expanded):
+# #             editor_key = f"editor_{sheet_name}"
+# #             initial_df = current_config[sheet_name].copy().fillna("")
+# #             # Ensure we have a DataFrame (convert if needed)
+# #             existing = st.session_state.get(editor_key)
+# #             if existing is not None and not isinstance(existing, pd.DataFrame):
+# #                 # If it's a dict or something else, convert to DataFrame
+# #                 try:
+# #                     existing = pd.DataFrame(existing)
+# #                 except:
+# #                     existing = initial_df
+# #             else:
+# #                 existing = initial_df
+# #             edited_df = st.data_editor(
+# #                 existing,
+# #                 key=editor_key,
+# #                 use_container_width=True,
+# #                 num_rows="dynamic"
+# #             )
+# #             # The widget updates st.session_state[editor_key] automatically
+
+# #     if st.button("Save All Changes", use_container_width=True):
+# #         try:
+# #             file_path = RULES_FILE
+# #             st.info(f"Saving to: {file_path}")
+
+# #             from openpyxl import Workbook
+# #             from openpyxl.utils.dataframe import dataframe_to_rows
+
+# #             wb = Workbook()
+# #             wb.remove(wb.active)
+
+# #             for sheet_name in all_sheets:
+# #                 editor_key = f"editor_{sheet_name}"
+# #                 df = st.session_state.get(editor_key)
+# #                 if df is None or not isinstance(df, pd.DataFrame):
+# #                     df = current_config[sheet_name].copy().fillna("")
+# #                 if not isinstance(df, pd.DataFrame):
+# #                     df = pd.DataFrame(df)
+# #                 ws = wb.create_sheet(title=sheet_name)
+# #                 for r in dataframe_to_rows(df, index=False, header=True):
+# #                     ws.append(r)
+
+# #             wb.save(file_path)
+
+
+# #             # --- DEBUG: Show all sheets in the saved file ---
+# #             debug_config = load_config(file_path)
+# #             st.success(f"File saved successfully!")
+# #             with st.expander("🔍 Debug: Saved file content", expanded=True):
+# #                 st.write(f"**File path:** {file_path}")
+# #                 for sheet_name in sorted(debug_config.keys()):
+# #                     st.write(f"**{sheet_name}**")
+# #                     df = debug_config[sheet_name]
+# #                     st.dataframe(df.head(3))
+
+
+# #             st.success("Changes saved successfully!")
+
+# #             st.session_state['config'] = load_config(file_path)
+# #             for sheet_name in all_sheets:
+# #                 editor_key = f"editor_{sheet_name}"
+# #                 if editor_key in st.session_state:
+# #                     del st.session_state[editor_key]
+# #             st.rerun()
+# #         except Exception as e:
+# #             st.error(f"Save failed: {e}")
+
+# #     st.markdown('</div>', unsafe_allow_html=True)
+
+# # -------- TAB 3: DOWNLOADS --------
+# with tab3:
+#     st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+#     st.markdown("### Download Files")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("#### Generated Schedule")
-        if st.session_state.get('output_file') and os.path.exists(st.session_state['output_file']):
-            with open(st.session_state['output_file'], "rb") as f:
-                st.download_button(
-                    label="Download Schedule",
-                    data=f,
-                    file_name=os.path.basename(st.session_state['output_file']),
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-        else:
-            st.info("No schedule generated yet. Run the scheduler first.")
+#     col1, col2 = st.columns(2)
+#     with col1:
+#         st.markdown("#### Generated Schedule")
+#         if st.session_state.get('output_file') and os.path.exists(st.session_state['output_file']):
+#             with open(st.session_state['output_file'], "rb") as f:
+#                 st.download_button(
+#                     label="Download Schedule",
+#                     data=f,
+#                     file_name=os.path.basename(st.session_state['output_file']),
+#                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+#                     use_container_width=True
+#                 )
+#         else:
+#             st.info("No schedule generated yet. Run the scheduler first.")
     
-    with col2:
-        st.markdown("#### Rules.xlsx")
-        if os.path.exists(RULES_FILE):
-            with open(RULES_FILE, "rb") as f:
-                st.download_button(
-                    label="Download Updated Rules",
-                    data=f,
-                    file_name="Rules_updated.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-        else:
-            st.info("No Rules.xlsx available.")
+#     with col2:
+#         st.markdown("#### Rules.xlsx")
+#         if os.path.exists(RULES_FILE):
+#             with open(RULES_FILE, "rb") as f:
+#                 st.download_button(
+#                     label="Download Updated Rules",
+#                     data=f,
+#                     file_name="Rules_updated.xlsx",
+#                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+#                     use_container_width=True
+#                 )
+#         else:
+#             st.info("No Rules.xlsx available.")
     
-    st.markdown("---")
-    st.markdown("#### Template File")
-    if st.session_state.get('template_path') and os.path.exists(st.session_state['template_path']):
-        with open(st.session_state['template_path'], "rb") as f:
+#     st.markdown("---")
+#     st.markdown("#### Template File")
+#     if st.session_state.get('template_path') and os.path.exists(st.session_state['template_path']):
+#         with open(st.session_state['template_path'], "rb") as f:
+#             st.download_button(
+#                 label="Download Template",
+#                 data=f,
+#                 file_name=os.path.basename(st.session_state['template_path']),
+#                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+#                 use_container_width=True
+#             )
+#     else:
+#         st.info("No template file uploaded.")
+    
+#     st.markdown("""
+#     <div class="footer">
+#         IM2 - Internal Use Only
+#     </div>
+#     """, unsafe_allow_html=True)
+#     st.markdown('</div>', unsafe_allow_html=True)
+
+# -------- RUN SECTION --------
+st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+st.markdown("### Generate Schedule")
+
+# Use the latest config from session state
+current_config = st.session_state.get('config', config)
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Doctors", len(current_config.get("Doctors", pd.DataFrame())))
+with col2:
+    stations = current_config.get("Stations", pd.DataFrame())
+    st.metric("Stations", len(stations))
+with col3:
+    duties = current_config.get("DutyTypes", pd.DataFrame())
+    st.metric("Duty Types", len(duties))
+
+output_file = st.text_input("Output filename", "Stationsplan_out.xlsx")
+
+if st.button("Generate Schedule", use_container_width=True):
+    with st.spinner("Generating schedule..."):
+        try:
+            template_path = st.session_state.get('template_path')
+            if template_path is None or not os.path.exists(template_path):
+                st.error("Please upload a valid Template file (Stationsplan) in the sidebar.")
+                st.stop()
+            
+            rules_file_path = RULES_FILE
+            st.info(f"Reading your local Rules file...")
+
+            settings_df = current_config.get("Settings", pd.DataFrame()).copy()
+            settings_df.loc[settings_df["Setting"] == "TemplateFile", "Value"] = template_path
+            settings_df.loc[settings_df["Setting"] == "OutputFile", "Value"] = output_file
+            if st.session_state.get('wishes_path'):
+                settings_df.loc[settings_df["Setting"] == "WishesFile", "Value"] = st.session_state['wishes_path']
+            
+            with pd.ExcelWriter(rules_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                settings_df.to_excel(writer, sheet_name="Settings", index=False)
+
+            wishes = st.session_state.get('wishes_path')
+            if 'SpecialWeekendDays' in current_config:
+                df = current_config['SpecialWeekendDays'].copy()
+                if 'Date' in df.columns:
+                    df['Date'] = pd.to_datetime(df['Date']).dt.date.astype(str)
+                current_config['SpecialWeekendDays'] = df
+
+            success, log_output = run_scheduler(template_path, output_file, None, wishes, config_dict=current_config)
+            
+            st.session_state['log_output'] = log_output
+
+            if success:
+                st.success("Schedule generated successfully!")
+                st.session_state['output_file'] = output_file
+            else:
+                st.error("Scheduler failed. See the log below for details.")
+
+            with st.expander("log", expanded=True):
+                if log_output:
+                    st.code(log_output, language="text")
+                else:
+                    st.info("No log output captured.")
+
+        except Exception as e:
+            st.error(f"Error: {e}")
+            st.code(traceback.format_exc(), language="python")
+st.markdown('</div>', unsafe_allow_html=True)
+
+# -------- DOWNLOADS SECTION --------
+st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+st.markdown("### Download Files")
+
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("#### Generated Schedule")
+    if st.session_state.get('output_file') and os.path.exists(st.session_state['output_file']):
+        with open(st.session_state['output_file'], "rb") as f:
             st.download_button(
-                label="Download Template",
+                label="Download Schedule",
                 data=f,
-                file_name=os.path.basename(st.session_state['template_path']),
+                file_name=os.path.basename(st.session_state['output_file']),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
     else:
-        st.info("No template file uploaded.")
-    
-    st.markdown("""
-    <div class="footer">
-        IM2 - Internal Use Only
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.info("No schedule generated yet. Run the scheduler first.")
+
+with col2:
+    st.markdown("#### Rules.xlsx")
+    if os.path.exists(RULES_FILE):
+        with open(RULES_FILE, "rb") as f:
+            st.download_button(
+                label="Download Updated Rules",
+                data=f,
+                file_name="Rules_updated.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+    else:
+        st.info("No Rules.xlsx available.")
+
+st.markdown("---")
+st.markdown("#### Template File")
+if st.session_state.get('template_path') and os.path.exists(st.session_state['template_path']):
+    with open(st.session_state['template_path'], "rb") as f:
+        st.download_button(
+            label="Download Template",
+            data=f,
+            file_name=os.path.basename(st.session_state['template_path']),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+else:
+    st.info("No template file uploaded.")
+
+st.markdown("""
+<div class="footer">
+    IM2 - Internal Use Only
+</div>
+""", unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)

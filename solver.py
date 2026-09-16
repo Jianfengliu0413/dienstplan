@@ -328,7 +328,7 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
 
     # 7. Max total weekend duties per doctor
     max_weekend_per_doctor = int(general.get('MaxWeekendPerDoctor', 1)) 
-                model_cp.Add(sum(x[(i, j)] for i in weekend_indices) <= max_weekend_per_doctor)
+    # model_cp.Add(sum(x[(i, j)] for i in weekend_indices) <= max_weekend_per_doctor)
     if constraints_cfg.get('MaxOneWeekendPerDoctor', 'Yes') == 'Yes':
         for j in range(num_doctors):
             weekend_indices = [

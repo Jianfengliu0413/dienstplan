@@ -683,10 +683,18 @@ with tab3:
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ---- Persistent log (visible regardless of which tab is active) ----
+if st.session_state.get('log_output'):
+    st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+    st.markdown("### Scheduler Log")
+    with st.expander("Show log", expanded=False):
+        st.code(st.session_state['log_output'], language="text")
 
-# --- Display the captured log ---
-with st.expander("log", expanded=True):
-    if log_output:
-        st.code(log_output, language="text")
-    else:
-        st.info("No log output captured.")
+    st.download_button(
+        label="Download log",
+        data=st.session_state['log_output'].encode('utf-8'),
+        file_name="scheduler_log.txt",
+        mime="text/plain",
+        use_container_width=True,
+    )
+    st.markdown('</div>', unsafe_allow_html=True)

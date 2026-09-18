@@ -55,26 +55,44 @@ def add_soft_constraints(
             for i in duty_indices:
                 penalties.append(day_off_weight * x_vars[(i, j)])
 
-    # 3. Workload balance (hours‑based)
+    # # 3. Workload balance (hours‑based)
+    # balance_weight = int(penalties_cfg.get('WorkloadBalance', 100))
+    # if balance_weight != 0:
+    #     total_initial_hours = sum(initial_hours.values())
+    #     total_month_hours = sum(duty_hours)
+    #     total_fte = sum(doc.fte for doc in schedule.doctors.values()) / 100.0
+    #     SCALE = 10
+    #     for j, doc_name in enumerate(doctors):
+    #         doc = schedule.doctors[doc_name]
+    #         target_final = (total_initial_hours + total_month_hours) * (doc.fte / 100) / total_fte if total_fte > 0 else 0
+    #         target_this_month = target_final - initial_hours.get(doc_name, 0.0)
+    #         target_scaled = int(target_this_month * SCALE)
+    #         assigned_scaled = model_cp.NewIntVar(0, int(total_month_hours * SCALE), f'assigned_scaled_{j}')
+    #         model_cp.Add(assigned_scaled == sum(int(duty_hours[i] * SCALE) * x_vars[(i, j)] for i in range(num_duties)))
+    #         pos_dev = model_cp.NewIntVar(0, int(total_month_hours * SCALE), f'hpos_{j}')
+    #         neg_dev = model_cp.NewIntVar(0, int(total_month_hours * SCALE), f'hneg_{j}')
+    #         model_cp.Add(assigned_scaled - target_scaled == pos_dev - neg_dev)
+    #         penalties.append(balance_weight * pos_dev)
+    #         penalties.append(balance_weight * neg_dev)
+
+    # 3. Workload balance (count‑based, FTE‑proportional)
     balance_weight = int(penalties_cfg.get('WorkloadBalance', 100))
-    if balance_weight != 0:
-        total_initial_hours = sum(initial_hours.values())
-        total_month_hours = sum(duty_hours)
-        total_fte = sum(doc.fte for doc in schedule.doctors.values()) / 100.0
-        SCALE = 10
+    if balance_weight != 0 and num_doctors > 0:
+        total_duties_count = num_duties
+        total_fte = sum(doc.fte for doc in schedule.doctors.values())
         for j, doc_name in enumerate(doctors):
             doc = schedule.doctors[doc_name]
-            target_final = (total_initial_hours + total_month_hours) * (doc.fte / 100) / total_fte if total_fte > 0 else 0
-            target_this_month = target_final - initial_hours.get(doc_name, 0.0)
-            target_scaled = int(target_this_month * SCALE)
-            assigned_scaled = model_cp.NewIntVar(0, int(total_month_hours * SCALE), f'assigned_scaled_{j}')
-            model_cp.Add(assigned_scaled == sum(int(duty_hours[i] * SCALE) * x_vars[(i, j)] for i in range(num_duties)))
-            pos_dev = model_cp.NewIntVar(0, int(total_month_hours * SCALE), f'hpos_{j}')
-            neg_dev = model_cp.NewIntVar(0, int(total_month_hours * SCALE), f'hneg_{j}')
-            model_cp.Add(assigned_scaled - target_scaled == pos_dev - neg_dev)
+            # Each doctor's target = total duties × (their FTE share)
+            target_float = (total_duties_count * (doc.fte / total_fte)) if total_fte > 0 else 0.0
+            target = int(round(target_float))
+            assigned_count = model_cp.NewIntVar(0, num_duties, f'cnt_{j}')
+            model_cp.Add(assigned_count == sum(x_vars[(i, j)] for i in range(num_duties)))
+            pos_dev = model_cp.NewIntVar(0, num_duties, f'cnt_pos_{j}')
+            neg_dev = model_cp.NewIntVar(0, num_duties, f'cnt_neg_{j}')
+            model_cp.Add(assigned_count - target == pos_dev - neg_dev)
             penalties.append(balance_weight * pos_dev)
             penalties.append(balance_weight * neg_dev)
-    
+        
     # 4. Weekend balance (equal distribution) 
     weekend_weight = int(penalties_cfg.get('WeekendBalance', 15))
     if weekend_weight != 0 and num_doctors > 0:

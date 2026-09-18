@@ -524,12 +524,12 @@ with tab1:
                 else:
                     st.error("Scheduler failed. See the log below for details.")
 
-                # --- Display the captured log ---
-                with st.expander("log", expanded=True):
-                    if log_output:
-                        st.code(log_output, language="text")
-                    else:
-                        st.info("No log output captured.")
+                # # --- Display the captured log ---
+                # with st.expander("log", expanded=True):
+                #     if log_output:
+                #         st.code(log_output, language="text")
+                #     else:
+                #         st.info("No log output captured.")
 
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -682,3 +682,11 @@ with tab3:
     </div>
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+
+
+# --- Display the captured log ---
+with st.expander("log", expanded=True):
+    if log_output:
+        st.code(log_output, language="text")
+    else:
+        st.info("No log output captured.")

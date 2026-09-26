@@ -92,25 +92,62 @@ def add_soft_constraints(
             model_cp.Add(assigned_count - target == pos_dev - neg_dev)
             penalties.append(balance_weight * pos_dev)
             penalties.append(balance_weight * neg_dev)
-        
-    # 4. Weekend balance (equal distribution) 
-    weekend_weight = int(penalties_cfg.get('WeekendBalance', 15))
-    if weekend_weight != 0 and num_doctors > 0:
+
+    # ============================================================
+    # 4b. EXPLICIT WEEKEND FAIRNESS (high weight, slot + weekend level)
+    # ============================================================
+    weekend_fairness_weight = int(penalties_cfg.get('WeekendFairness', 2000))
+    if weekend_fairness_weight != 0 and num_doctors > 0:
         weekend_days = [idx for idx, day in enumerate(schedule.days) if day.is_weekend]
         weekend_duty_indices = [i for i, (d, _, _) in enumerate(duties) if d in weekend_days]
+
         if weekend_duty_indices:
-            K = len(weekend_duty_indices)
-            floor_val = K // num_doctors
-            ceil_val = (K + num_doctors - 1) // num_doctors
+            # --- A) Balance weekend SLOTS (each Sat or Sun shift counts as 1) ---
+            K_slots = len(weekend_duty_indices)
+            avg_slots_x100 = int(round((K_slots / num_doctors) * 100))
+
             for j in range(num_doctors):
-                weekend_assigned = model_cp.NewIntVar(0, K, f'weekend_{j}')
-                model_cp.Add(weekend_assigned == sum(x_vars[(i, j)] for i in weekend_duty_indices))
-                over = model_cp.NewIntVar(0, K, f'w_over_{j}')
-                under = model_cp.NewIntVar(0, K, f'w_under_{j}')
-                model_cp.Add(weekend_assigned - ceil_val <= over)
-                model_cp.Add(floor_val - weekend_assigned <= under)
-                penalties.append(weekend_weight * over)
-                penalties.append(weekend_weight * under)
+                slots_var = model_cp.NewIntVar(0, K_slots, f'wk_slots_{j}')
+                model_cp.Add(slots_var == sum(x_vars[(i, j)] for i in weekend_duty_indices))
+
+                scaled = model_cp.NewIntVar(0, K_slots * 100, f'wk_slots_scaled_{j}')
+                model_cp.Add(scaled == slots_var * 100)
+
+                dev = model_cp.NewIntVar(0, K_slots * 100, f'wk_slots_dev_{j}')
+                model_cp.AddAbsEquality(dev, scaled - avg_slots_x100)
+
+                penalties.append(weekend_fairness_weight * dev)
+
+        # --- B) Balance DISTINCT WEEKENDS WORKED (Sat+Sun in same ISO week = 1 weekend) ---
+        weekend_week_duties = defaultdict(list)
+        for i, (day_idx, _, _) in enumerate(duties):
+            if schedule.days[day_idx].is_weekend:
+                wk = schedule.days[day_idx].date.isocalendar().week
+                weekend_week_duties[wk].append(i)
+
+        total_weekends = len(weekend_week_duties)
+        if total_weekends > 0:
+            avg_weekends_x100 = int(round((total_weekends / num_doctors) * 100))
+
+            for j in range(num_doctors):
+                weekend_vars = []
+                for wk, idxs in weekend_week_duties.items():
+                    w = model_cp.NewBoolVar(f'wk_bool_{j}_{wk}')
+                    for i in idxs:
+                        model_cp.Add(w >= x_vars[(i, j)])
+                    weekend_vars.append(w)
+
+                total_wk_var = model_cp.NewIntVar(0, total_weekends, f'wk_total_{j}')
+                model_cp.Add(total_wk_var == sum(weekend_vars))
+
+                scaled = model_cp.NewIntVar(0, total_weekends * 100, f'wk_total_scaled_{j}')
+                model_cp.Add(scaled == total_wk_var * 100)
+
+                dev = model_cp.NewIntVar(0, total_weekends * 100, f'wk_total_dev_{j}')
+                model_cp.AddAbsEquality(dev, scaled - avg_weekends_x100)
+
+                penalties.append(weekend_fairness_weight * dev)
+
     # 5. Weekend pairing and home‑station bonus for PR
     weekend_pairing_reward = int(penalties_cfg.get('WeekendPairingReward', 30))
     weekend_single_penalty = int(penalties_cfg.get('WeekendSinglePenalty', 20))

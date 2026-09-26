@@ -571,140 +571,121 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
         "Even with relaxed skill constraints, the model is infeasible. "
         "Please reduce demand (e.g., lower DutyCounts) or add more doctors."
     )
+
+
 def auto_relax_and_solve(schedule, config, duties, doctors, demand, duty_hours, initial_hours):
     """
-    Attempt to solve with 17 gradual stages.
-    Main doctor cap is increased early to reduce reliance on non‑main doctors.
+    Attempt to solve with gradual relaxation stages.
+
+    Strategy:
+      - ALWAYS keep fairness/eligibility constraints enabled:
+          * WeekendAvailability
+          * WeekendOnlyFullTime
+          * WeekendOnlyForSkilled
+          * MainDoctorMaxOneWeekend
+          * SeniorRequired
+          * WeekendOnly
+      - Only increase numeric caps (MaxWeekendPerDoctor, MaxWeekendPRPerDoctor,
+        MaxConsecutiveWorkDays, MaxDutiesPerWeek, MainDoctorMaxWeekend,
+        MaxSDPerDoctor, MaxZDPerDoctor, MaxNAZPerDoctor, MaxHouseShifts).
+      - Only as an ABSOLUTE last resort, disable the "nice-to-have" caps
+        (MaxHouseShifts, MaxNAZ, MaxSD, MaxZD), but NEVER the weekend/FTE rules.
+      - NEVER remove PR demand from stations.
     """
+
+    # ---- Helper: define a stage ----
+    def stage(caps=None, disable=None):
+        return {
+            'caps': caps or {},
+            'disable': disable or [],
+        }
+
+    # Order of "acceptable to disable" constraints (least critical first).
+    # These are caps, not eligibility rules. Disabling them just makes the
+    # schedule less balanced, not unfair in terms of who can work weekends.
+    SOFT_DISABLE_ORDER = [
+        'MaxHouseShifts',
+        'MaxNAZ',
+        'MaxSD',
+        'MaxZD',
+    ]
+
+    # ---- Build the staged plan ----
+    # Base caps (Stage 1) are the configured values, then we raise them gradually.
     stages = []
 
-    # ---- Stage 1‑6: moderate cap increases ----
-    caps_seq = [
-        (5, 2, 7, 7, 1),   # (MaxWeekendPerDoctor, MaxWeekendPRPerDoctor, MaxConsecutive, MaxDutiesPerWeek, MainDoctorMaxWeekend)
-        (5, 2, 8, 8, 1),
-        (5, 2, 8, 8, 1),
-        (6, 2, 9, 9, 2),   # keep pr=2
-        (6, 3, 9, 9, 2),   # pr=3 at stage5
-        (7, 3, 10, 10, 1),
+    # ---- Stage 1-8: gradually raise numeric caps, never disable anything ----
+    caps_progression = [
+        # (MaxWeekendPerDoctor, MaxWeekendPRPerDoctor, MaxConsecutiveWorkDays,
+        #  MaxDutiesPerWeek, MainDoctorMaxWeekend, MaxSD, MaxZD, MaxNAZ, MaxHouseShifts)
+        (3,  1,  8,  8,  2,  3, 4, 1, 1),   # Stage 1 – as configured
+        (4,  2,  8,  8,  2,  4, 5, 2, 2),   # Stage 2
+        (5,  2,  9,  9,  3,  5, 6, 2, 2),   # Stage 3
+        (6,  3,  9,  9,  3,  6, 7, 3, 3),   # Stage 4
+        (7,  3, 10, 10,  4,  7, 8, 3, 3),   # Stage 5
+        (8,  4, 10, 10,  5,  8, 9, 4, 4),   # Stage 6
+        (10, 5, 12, 12,  6, 10,12, 5, 5),   # Stage 7
+        (15, 8, 14, 14, 10, 15,15, 8, 8),   # Stage 8 – very high caps
     ]
-    for i, (w, pr, cons, week, main) in enumerate(caps_seq, start=1):
-        stages.append({
-            'caps': {
-                'MaxWeekendPerDoctor': w,
-                'MaxWeekendPRPerDoctor': pr,
-                'MaxConsecutiveWorkDays': cons,
-                'MaxDutiesPerWeek': week,
-                'MainDoctorMaxWeekend': main
-            },
-            'disable': []
-        })
 
-    # ---- Stage 7: increase main doctor cap to 2 ----
-    stages.append({
-        'caps': {
-            'MaxWeekendPerDoctor': 7,
-            'MaxWeekendPRPerDoctor': 3,
-            'MaxConsecutiveWorkDays': 10,
-            'MaxDutiesPerWeek': 10,
-            'MainDoctorMaxWeekend': 2
+    for i, (w, pr, cons, week, main, sd, zd, naz, hd) in enumerate(caps_progression, start=1):
+        stages.append(stage(caps={
+            'MaxWeekendPerDoctor': w,
+            'MaxWeekendPRPerDoctor': pr,
+            'MaxConsecutiveWorkDays': cons,
+            'MaxDutiesPerWeek': week,
+            'MainDoctorMaxWeekend': main,
+            'MaxSDPerDoctor': sd,
+            'MaxZDPerDoctor': zd,
+            'MaxNAZPerDoctor': naz,
+            'MaxHouseShifts': hd,
+        }))
+
+    # ---- Stage 9-12: keep high caps, disable one soft cap at a time ----
+    high_caps = {
+        'MaxWeekendPerDoctor': 15,
+        'MaxWeekendPRPerDoctor': 8,
+        'MaxConsecutiveWorkDays': 14,
+        'MaxDutiesPerWeek': 14,
+        'MainDoctorMaxWeekend': 10,
+        'MaxSDPerDoctor': 15,
+        'MaxZDPerDoctor': 15,
+        'MaxNAZPerDoctor': 8,
+        'MaxHouseShifts': 8,
+    }
+
+    disabled_so_far = []
+    for idx, cons_name in enumerate(SOFT_DISABLE_ORDER, start=9):
+        disabled_so_far = disabled_so_far + [cons_name]
+        stages.append(stage(
+            caps=dict(high_caps),
+            disable=list(disabled_so_far),
+        ))
+
+    # ---- Stage 13: absolute last resort – highest caps, all soft caps disabled ----
+    stages.append(stage(
+        caps={
+            'MaxWeekendPerDoctor': 30,
+            'MaxWeekendPRPerDoctor': 20,
+            'MaxConsecutiveWorkDays': 31,
+            'MaxDutiesPerWeek': 31,
+            'MainDoctorMaxWeekend': 30,
+            'MaxSDPerDoctor': 30,
+            'MaxZDPerDoctor': 30,
+            'MaxNAZPerDoctor': 20,
+            'MaxHouseShifts': 30,
         },
-        'disable': []
-    })
+        disable=list(SOFT_DISABLE_ORDER),
+    ))
 
-    # ---- Stage 8‑11: disable other constraints (keep caps as they are) ---- 
-    disable_order = [
-        ['MaxOneWeekendPerDoctor'],                     # stage8
-        ['MaxHouseShifts', 'MaxNAZ'],                   # stage9 – keep MaxSD and MaxZD
-        ['WeekendAvailability', 'WeekendOnlyForSkilled'], # stage10
-        ['WeekendOnlyFullTime', 'MaxConsecutive', 'MaxPerWeek'], # stage11
-        # Only disable SD/ZD caps as a very last resort
-        ['MaxSD'],                                      # stage12
-        ['MaxZD'],                                      # stage13
-    ]
-    for idx, dlist in enumerate(disable_order, start=8):
-        stages.append({
-            'caps': {
-                'MaxWeekendPerDoctor': 7,
-                'MaxWeekendPRPerDoctor': 3,
-                'MaxConsecutiveWorkDays': 10,
-                'MaxDutiesPerWeek': 10,
-                'MainDoctorMaxWeekend': 2
-            },
-            'disable': dlist
-        })
-
-    # ---- Stage 12‑13: increase general caps if still needed ----
-    caps_seq2 = [
-        (8, 4, 10, 10, 2),
-        (9, 4, 10, 10, 2),
-    ]
-    for i, (w, pr, cons, week, main) in enumerate(caps_seq2, start=12):
-        stages.append({
-            'caps': {
-                'MaxWeekendPerDoctor': w,
-                'MaxWeekendPRPerDoctor': pr,
-                'MaxConsecutiveWorkDays': cons,
-                'MaxDutiesPerWeek': week,
-                'MainDoctorMaxWeekend': main
-            },
-            'disable': []   # keep previous disables
-        })
-
-    # ---- Stage 14‑15: further increase main doctor cap ----
-    stages.append({
-        'caps': {
-            'MaxWeekendPerDoctor': 9,
-            'MaxWeekendPRPerDoctor': 5,
-            'MaxConsecutiveWorkDays': 10,
-            'MaxDutiesPerWeek': 10,
-            'MainDoctorMaxWeekend': 3
-        },
-        'disable': []
-    })
-    stages.append({
-        'caps': {
-            'MaxWeekendPerDoctor': 10,
-            'MaxWeekendPRPerDoctor': 6,
-            'MaxConsecutiveWorkDays': 10,
-            'MaxDutiesPerWeek': 10,
-            'MainDoctorMaxWeekend': 4
-        },
-        'disable': []
-    })
-
-    # ---- Stage 16: last resort – disable MainDoctorMaxOneWeekend ----
-    stages.append({
-        'caps': {
-            'MaxWeekendPerDoctor': 10,
-            'MaxWeekendPRPerDoctor': 6,
-            'MaxConsecutiveWorkDays': 10,
-            'MaxDutiesPerWeek': 10,
-            'MainDoctorMaxWeekend': 10
-        },
-        'disable': ['MainDoctorMaxOneWeekend']
-    })
-
-    # ---- Stage 17: absolute last resort – remove PR demand ----
-    stages.append({
-        'caps': {
-            'MaxWeekendPerDoctor': 10,
-            'MaxWeekendPRPerDoctor': 10,
-            'MaxConsecutiveWorkDays': 10,
-            'MaxDutiesPerWeek': 10,
-            'MainDoctorMaxWeekend': 10
-        },
-        'disable': ['MainDoctorMaxOneWeekend'],
-        'remove_pr': True
-    })
-
-    # Apply stages
+    # ---- Apply stages ----
     all_adjustments = []
     relaxed_config = copy.deepcopy(config)
 
-    for stage_idx, stage in enumerate(stages, start=1):
-        print(f"\n--- Auto‑relaxation Stage {stage_idx} ---")
+    for stage_idx, st in enumerate(stages, start=1):
+        print(f"\n--- Auto-relaxation Stage {stage_idx} ---")
 
-        # Apply caps
+        # ----- Apply caps to GeneralRules -----
         general = relaxed_config.get('GeneralRules', pd.DataFrame())
         if general.empty or 'RuleName' not in general.columns:
             general = pd.DataFrame(columns=['RuleName', 'Value'])
@@ -712,24 +693,27 @@ def auto_relax_and_solve(schedule, config, duties, doctors, demand, duty_hours, 
             if general['Value'].dtype != object:
                 general['Value'] = general['Value'].astype(object)
 
-        for rule, new_val in stage['caps'].items():
+        for rule, new_val in st['caps'].items():
             if rule in general['RuleName'].values:
                 idx = general[general['RuleName'] == rule].index[0]
                 old = general.loc[idx, 'Value']
                 try:
-                    old_int = int(old)
+                    old_int = int(float(old))
                 except (ValueError, TypeError):
                     old_int = 0
                 if old_int < new_val:
                     general.at[idx, 'Value'] = str(new_val)
-                    all_adjustments.append(f"Stage {stage_idx}: Increased {rule} from {old} to {new_val}")
+                    all_adjustments.append(
+                        f"Stage {stage_idx}: Increased {rule} from {old} to {new_val}"
+                    )
             else:
                 new_row = pd.DataFrame({'RuleName': [rule], 'Value': [str(new_val)]})
                 general = pd.concat([general, new_row], ignore_index=True)
                 all_adjustments.append(f"Stage {stage_idx}: Added {rule} = {new_val}")
+
         relaxed_config['GeneralRules'] = general
 
-        # Disable constraints
+        # ----- Disable only the explicitly allowed soft constraints -----
         constraints = relaxed_config.get('Constraints', pd.DataFrame())
         if constraints.empty or 'Constraint' not in constraints.columns:
             constraints = pd.DataFrame(columns=['Constraint', 'Enabled'])
@@ -737,55 +721,67 @@ def auto_relax_and_solve(schedule, config, duties, doctors, demand, duty_hours, 
             if constraints['Enabled'].dtype != object:
                 constraints['Enabled'] = constraints['Enabled'].astype(object)
 
-        for cons in stage.get('disable', []):
+        for cons in st['disable']:
             if cons in constraints['Constraint'].values:
                 idx = constraints[constraints['Constraint'] == cons].index[0]
                 if constraints.loc[idx, 'Enabled'] == 'Yes':
                     constraints.at[idx, 'Enabled'] = 'No'
-                    all_adjustments.append(f"Stage {stage_idx}: Disabled constraint {cons}")
+                    all_adjustments.append(
+                        f"Stage {stage_idx}: Disabled constraint {cons}"
+                    )
             else:
                 new_row = pd.DataFrame({'Constraint': [cons], 'Enabled': ['No']})
                 constraints = pd.concat([constraints, new_row], ignore_index=True)
-                all_adjustments.append(f"Stage {stage_idx}: Added constraint {cons} = No")
+                all_adjustments.append(
+                    f"Stage {stage_idx}: Added constraint {cons} = No"
+                )
         relaxed_config['Constraints'] = constraints
 
-        # Remove PR demand (only stage 17)
-        if stage.get('remove_pr', False):
-            stations = relaxed_config.get('Stations', pd.DataFrame())
-            if not stations.empty and 'Station' in stations.columns:
-                for idx, row in stations.iterrows():
-                    station = row['Station']
-                    if station in MAIN_STATIONS:
-                        weekend_counts = row.get('WeekendDutyCounts', '')
-                        if pd.isna(weekend_counts):
-                            weekend_counts = ''
-                        if 'PR=' in weekend_counts:
-                            parts = [p.strip() for p in weekend_counts.split(',') if p.strip()]
-                            new_parts = [p for p in parts if not p.startswith('PR=')]
-                            if not new_parts:
-                                new_val = ''
-                            else:
-                                new_val = ', '.join(new_parts)
-                            if new_val != weekend_counts:
-                                stations.at[idx, 'WeekendDutyCounts'] = new_val
-                                all_adjustments.append(f"Stage {stage_idx}: Removed PR from {station} weekend demand")
-                relaxed_config['Stations'] = stations
-
-        print("Attempting solve with current relaxations...")
+        # ----- Attempt the solve -----
+        print(f"Attempting solve with Stage {stage_idx} relaxations...")
         try:
-            result = _solve_internal(schedule, relaxed_config, duties, doctors, demand, duty_hours, initial_hours, repair_mode=True)
+            result = _solve_internal(
+                schedule, relaxed_config, duties, doctors, demand,
+                duty_hours, initial_hours, repair_mode=True,
+            )
             print(f"Stage {stage_idx} succeeded!")
             print("Relaxations applied:")
             for adj in all_adjustments:
                 print(f"  - {adj}")
+
+            # ----- DIAGNOSTIC: per-doctor weekend count -----
+            assignment = result[0]
+            print("\n=== Weekend duty counts per doctor (after solve) ===")
+            from collections import Counter
+            weekend_counts = Counter()
+            total_weekends_per_doc = Counter()
+            for i, doc in assignment.items():
+                day_idx, _, _ = duties[i]
+                if schedule.days[day_idx].is_weekend:
+                    weekend_counts[doc] += 1
+            # Count distinct weekends (ISO week groups)
+            weekends_worked = defaultdict(set)
+            for i, doc in assignment.items():
+                day_idx, _, _ = duties[i]
+                if schedule.days[day_idx].is_weekend:
+                    wk = schedule.days[day_idx].date.isocalendar().week
+                    weekends_worked[doc].add(wk)
+            for doc in sorted(doctors, key=lambda d: -len(weekends_worked[d])):
+                print(f"  {doc}: {weekend_counts[doc]} weekend slots, "
+                      f"{len(weekends_worked[doc])} distinct weekends")
+
             return result
         except RuntimeError:
             print(f"Stage {stage_idx} failed. Continuing to next stage...")
             continue
 
+    # ---- If we get here, even the most relaxed stage failed ----
     raise RuntimeError(
         "Auto-relaxation could not find a feasible solution after all stages.\n"
-        "Adjustments made:\n" + "\n".join(all_adjustments) +
-        "\nConsider reducing demand (e.g., lower PR counts) or adding more doctors."
+        "Relaxations attempted:\n" + "\n".join(all_adjustments) +
+        "\n\nCheck the following:\n"
+        "  - Are there enough doctors with Weekend=Yes and Active=Yes?\n"
+        "  - Is the weekend PR demand per station <= number of available main doctors?\n"
+        "  - Are fixed wishes conflicting with vacation/HD/NAZ caps?\n"
+        "  - Is MaxWeekendPerDoctor large enough?\n"
     )
- 

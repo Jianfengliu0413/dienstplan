@@ -149,6 +149,13 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
             )
             print(f"[Demand] Added NAZ on {model.days[day_idx].date} from wishes")
 
+    # --- Add HD demand from wishes file (rows with "HD" in column A/B) ---
+    if hasattr(model, 'hd_demand_days'):
+        for day_idx in model.hd_demand_days:
+            demand[(day_idx, GLOBAL_STATION)]['HD'] = max(
+                demand[(day_idx, GLOBAL_STATION)].get('HD', 0), 1
+            )
+            print(f"[Demand] Added HD on {model.days[day_idx].date} from wishes")
     # 4. SUBSTITUTION LOGIC
     demand = add_substitute_demand(model, demand, excluded_stations)
 

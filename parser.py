@@ -763,6 +763,7 @@ def ensure_doctor_active(doc_name: str, model: ScheduleModel) -> bool:
         del model._inactive_doctors[doc_name]
         return True
     return False
+
 def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict, fixed_vals: set, vacation_color: str):
     """
     从愿望文件读取所有条目，**全部强制转为固定任务**，忽略：
@@ -940,29 +941,7 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
                 model.fixed_assignments.append((doc_name, day_idx, station, duty_abbr))
                 model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
                 print(f"[FIXED] (station): {doc_name} -> {duty_abbr} at {station} on {model.days[day_idx].date}")
-                continue
- 
-
-                # # 冲突检测
-                # if (doc_name, day_idx) in fixed_assignments_set:
-                #     print(f"[CONFLICT] {doc_name} already fixed on {model.days[day_idx].date}, downgrading {duty_abbr} to preference")
-                #     model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 50))
-                #     continue
-                # else:
-                #     fixed_assignments_set.add((doc_name, day_idx))
-
-                # # 自动添加技能
-                # if duty_abbr not in model.doctors[doc_name].skills:
-                #     model.doctors[doc_name].skills.add(duty_abbr)
-                #     print(f"Auto‑added skill {duty_abbr} to {doc_name}")
-
-                # model.fixed_assignments.append((doc_name, day_idx, station, duty_abbr))
-                # model.doctors[doc_name].preferences.append((day_idx, duty_abbr, 100))
-                # print(f"[FIXED] (station): {doc_name} -> {duty_abbr} at {station} on {model.days[day_idx].date}")
-                # continue
-
-            # # 其他任何内容忽略
-            # print(f"[Ignored]: {doc_name} on {model.days[day_idx].date} has value '{val_str}'")
+                continue 
 
     # ----- 解析 NAZ 需求行（如 "NAZ-Dienst(NAZ)"）-----
     naz_demand_days = set()
@@ -987,3 +966,29 @@ def apply_wishes_from_file(model: ScheduleModel, wishes_path: str, config: dict,
                     print(f"[NAZ demand] day {day_idx} ({model.days[day_idx].date}) from wishes row {row}")
 
     model.naz_demand_days = naz_demand_days
+
+    # ----- 解析 HD 需求行（如 "HD-Dienst(HD)"）-----
+    hd_demand_days = set()
+    for row in range(1, ws.max_row + 1):
+        cell_a = ws.cell(row=row, column=1)
+        cell_b = ws.cell(row=row, column=2) if ws.max_column >= 2 else None
+        val_a = cell_a.value if cell_a else ''
+        val_b = cell_b.value if cell_b else ''
+        if val_a is None: val_a = ''
+        if val_b is None: val_b = ''
+        if row in wish_rows.values():
+            continue
+        if 'HD' in str(val_a).upper() or 'HD' in str(val_b).upper():
+            # Avoid matching things like "HD" inside a doctor name or other tokens
+            # Only treat as HD demand row if the row label contains HD explicitly
+            for col, day_idx in day_cols_wish.items():
+                cell = ws.cell(row=row, column=col)
+                val = cell.value
+                if val is None:
+                    continue
+                norm_val = str(val).strip().upper()
+                if norm_val == 'HD':
+                    hd_demand_days.add(day_idx)
+                    print(f"[HD demand] day {day_idx} ({model.days[day_idx].date}) from wishes row {row}")
+
+    model.hd_demand_days = hd_demand_days

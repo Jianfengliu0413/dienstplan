@@ -52,9 +52,10 @@ class ScheduleModel:
     editable_cells: Set[tuple] = field(default_factory=set) # (row, col) we can fill
     # vacation / unavailable: (doctor_name, day_idx)
     unavailable: Set[tuple] = field(default_factory=set)
-    sheet_name: str = ""   # <--- ADD THIS LINE
+    sheet_name: str = ""
     found_station_names: Set[str] = field(default_factory=set)   # for writing config
     fixed_assignments: List[Tuple[str, int, str, str]] = field(default_factory=list)  # (doctor, day_idx, station, duty_abbr)
-    # In models.py, add to ScheduleModel
     station_zero_days: Dict[str, Set[int]] = field(default_factory=dict)  # station -> set of day_idx where row has '0'
     ima_sd_days: Set[int] = field(default_factory=set)  # days where IMA covers SD
+    naz_demand_days: Set[int] = field(default_factory=set)
+    hd_demand_days: Set[int] = field(default_factory=set)

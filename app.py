@@ -435,8 +435,33 @@ with tab1:
         duties = current_config.get("DutyTypes", pd.DataFrame())
         st.metric("Duty Types", len(duties))
     
-    output_file = st.text_input("Output filename", "Stationsplan_out.xlsx")
+    # output_file = st.text_input("Output filename", 
+    #                             "Stationsplan_out.xlsx",
+    #                             help="Name of the generated Excel file.",)
+    # ---- Output filename (auto-generated from template + today's date) ----
+    st.markdown("#### Output")
 
+    def build_default_output_name() -> str:
+        """Derive default output filename from the uploaded template + today's date."""
+        template_path = st.session_state.get("template_path")
+        if template_path:
+            base = os.path.splitext(os.path.basename(template_path))[0]
+        else:
+            base = "Stationsplan"
+        today = datetime.now().strftime("%Y%m%d")
+        return f"{base}_{today}.xlsx"
+
+    # Regenerate the default whenever the template changes
+    template_hash = st.session_state.get("file_hashes", {}).get("template")
+    if st.session_state.get("_output_default_hash") != template_hash:
+        st.session_state["_output_default_hash"] = template_hash
+        st.session_state["output_file_input"] = build_default_output_name()
+
+    output_file = st.text_input(
+        "Output filename",
+        key="output_file_input",
+        help="Auto-generated from the template name + today's date. You can edit it.",
+    )
     # if st.button("Generate Schedule", use_container_width=True):
     #     with st.spinner("Generating schedule..."):
     #         try:

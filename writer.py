@@ -121,13 +121,19 @@ def write_output(
                                 ws.cell(row=row, column=col).value = code
                             else:
                                 ws.cell(row=row, column=col).value = abbr
-                    if abbr == 'ZD':
+
+                    # --- Color coding ---
+                    # HD / NAZ at GLOBAL_STATION: red if NOT a fixed (requested) assignment
+                    if abbr in ('HD', 'NAZ') and station == GLOBAL_STATION:
+                        if (day_idx, station, abbr) not in fixed_set:
+                            ws.cell(row=row, column=col).fill = RED_FILL
+                        # else: leave as-is (fixed assignment color handled below)
+                    elif abbr == 'ZD':
                         ws.cell(row=row, column=col).fill = BLUE_FILL
-                    if abbr == 'SD':
+                    elif abbr == 'SD':
                         ws.cell(row=row, column=col).fill = ORANGE_FILL
                 except Exception:
                     pass
-
 
     # # 4. Compensatory SD (skip weekends, use col_for_day)
     # add_compensatory_sd(ws, schedule, assignment, duties, doctors, col_for_day)

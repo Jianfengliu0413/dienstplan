@@ -400,8 +400,9 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
         if station == '92 KMT' and schedule.days[day_idx].is_weekend and abbr == 'PR':
             if allowed_92_indices:
                 model_cp.Add(sum(x[(i, j)] for j in allowed_92_indices) == 1)
-            else:
-                model_cp.Add(0 == 1)
+            else: 
+                print("WARNING (repair): no allow_92_kmt doctors; 92 KMT PR unrestricted")
+                # model_cp.Add(0 == 1)
 
     # 13. NAZ restriction (only allowed doctors)
     allowed_naz_indices = [
@@ -409,12 +410,16 @@ def repair_schedule(schedule, config, duties, doctors, demand, duty_hours, initi
         if schedule.doctors[doc_name].allow_naz
     ]
     for i, (day_idx, station, abbr) in enumerate(duties):
+    #     if abbr == 'NAZ':
+    #         if allowed_naz_indices:
+    #             model_cp.Add(sum(x[(i, j)] for j in allowed_naz_indices) == 1)
+    #         else:
+    #             model_cp.Add(0 == 1)
         if abbr == 'NAZ':
             if allowed_naz_indices:
                 model_cp.Add(sum(x[(i, j)] for j in allowed_naz_indices) == 1)
             else:
-                model_cp.Add(0 == 1)
-
+                print(f"WARNING (repair): no allow_naz doctors; NAZ unrestricted")
     # 14. Max consecutive days 
     if constraints_cfg.get('MaxConsecutive', 'Yes') == 'Yes':
         max_consec = int(general.get('MaxConsecutiveWorkDays', 6))

@@ -213,7 +213,7 @@ def add_hard_constraints(
                 for j in range(num_doctors):
                     model_cp.Add(x_vars[(i, j)] == 0)
     # 7.5 Max weekend duties per doctor (hard constraint) 
-    max_weekend_per_doctor = int(general.get('MaxWeekendPerDoctor', 1)) # in 'GeneralRules' sheet of Rules.xlsx 
+    max_weekend_per_doctor = int(general.get('MaxWeekendPerDoctor', 3)) # in 'GeneralRules' sheet of Rules.xlsx 
     if constraints_cfg.get('MaxOneWeekendPerDoctor', 'Yes') == 'Yes':
         for j in range(num_doctors):
             weekend_duties_for_doctor = [
@@ -240,25 +240,23 @@ def add_hard_constraints(
             if schedule.days[day_idx].is_weekend:
                 for j, doc_name in enumerate(doctors):
                     if not schedule.doctors[doc_name].weekend_available:
-                        model_cp.Add(x_vars[(i, j)] == 0)
-
-    # # 10. Only doctors with 'Weekend' skill can work on weekends
+                        model_cp.Add(x_vars[(i, j)] == 0) 
+    # 10. Only doctors who are available on weekends (Weekend column = Yes) can work on weekends
     # if constraints_cfg.get('WeekendOnlyForSkilled', 'Yes') == 'Yes':
     #     for i, (day_idx, station, abbr) in enumerate(duties):
+    #         if i in fixed_duty_indices: continue
     #         if schedule.days[day_idx].is_weekend:
     #             for j, doc_name in enumerate(doctors):
-    #                 if 'Weekend' not in schedule.doctors[doc_name].skills:
+    #                 if not schedule.doctors[doc_name].weekend_available:
     #                     model_cp.Add(x_vars[(i, j)] == 0)
 
-    # 10. Only doctors who are available on weekends (Weekend column = Yes) can work on weekends
     if constraints_cfg.get('WeekendOnlyForSkilled', 'Yes') == 'Yes':
         for i, (day_idx, station, abbr) in enumerate(duties):
-            if i in fixed_duty_indices: continue
             if schedule.days[day_idx].is_weekend:
                 for j, doc_name in enumerate(doctors):
-                    if not schedule.doctors[doc_name].weekend_available:
-                        model_cp.Add(x_vars[(i, j)] == 0)
-
+                    if 'Weekend' not in schedule.doctors[doc_name].skills:
+                        model_cp.Add(x[(i, j)] == 0)
+    
     # 11. Max consecutive days
     if constraints_cfg.get('MaxConsecutive', 'Yes') == 'Yes':
         max_consec = int(general.get('MaxConsecutiveWorkDays', 6))
@@ -320,7 +318,8 @@ def add_hard_constraints(
             if allowed_naz_indices:
                 model_cp.Add(sum(x_vars[(i, j)] for j in allowed_naz_indices) == 1)
             else:
-                model_cp.Add(0 == 1)
+                print(f"WARNING: no allow_naz doctors; NAZ on day {day_idx} unrestricted")
+                # model_cp.Add(0 == 1)
     # --- 15. Max house shifts (HD) per doctor ---
     max_pr_weekend = int(general.get('MaxWeekendPRPerDoctor', 1))
     max_naz = int(general.get('MaxNAZPerDoctor', 2))

@@ -44,9 +44,12 @@ def write_output(
     end_col = ws.max_column
  
     # 构建固定任务集合
+    # fixed_set = set()
+    # for doc_name, day_idx, station, abbr in schedule.fixed_assignments:
+    #     fixed_set.add((day_idx, station, abbr))
     fixed_set = set()
     for doc_name, day_idx, station, abbr in schedule.fixed_assignments:
-        fixed_set.add((day_idx, station, abbr))
+        fixed_set.add((doc_name, day_idx, station, abbr))
     # 1. CLEAR ALL WEEKEND CELLS for every doctor row (using header scan)
     for doc_name, row in schedule.doctor_row.items():
         for col in range(start_col, end_col + 1):
@@ -97,9 +100,9 @@ def write_output(
             if schedule.days[day_idx].is_weekend and abbr == 'PR':
                 code = station_code_map_rev.get(station, station).upper()
                 ws.cell(row=row, column=col).value = code
-                # 非固定任务 → 红色填充
-                if (day_idx, station, abbr) not in fixed_set:
-                    ws.cell(row=row, column=col).fill = RED_FILL 
+                # Non-requested assignment → red fill
+                if (doc_name, day_idx, station, abbr) not in fixed_set:
+                    ws.cell(row=row, column=col).fill = RED_FILL
                 # 若该单元格不在 editable_cells，打印一次警告（可选）
                 # if (row, col) not in schedule.editable_cells:
                 #     print(f"Warning: forced write to non-editable weekend cell ({row},{col})")
@@ -123,41 +126,45 @@ def write_output(
                                 ws.cell(row=row, column=col).value = abbr
 
                     # --- Color coding ---
-                    # HD / NAZ at GLOBAL_STATION: red if NOT a fixed (requested) assignment
+                    # HD / NAZ at GLOBAL_STATION: red if NOT a fixed (requested) assignment 
                     if abbr in ('HD', 'NAZ') and station == GLOBAL_STATION:
-                        if (day_idx, station, abbr) not in fixed_set:
+                        if (doc_name, day_idx, station, abbr) not in fixed_set:
                             ws.cell(row=row, column=col).fill = RED_FILL
-                        # else: leave as-is (fixed assignment color handled below)
                     elif abbr == 'ZD':
                         ws.cell(row=row, column=col).fill = BLUE_FILL
                     elif abbr == 'SD':
                         ws.cell(row=row, column=col).fill = ORANGE_FILL
+
                 except Exception:
                     pass
 
     # # 4. Compensatory SD (skip weekends, use col_for_day)
     # add_compensatory_sd(ws, schedule, assignment, duties, doctors, col_for_day)
-    # Write fixed assignments (from wishes file)
+    # Write fixed assignments (from wishes file) 
     for doc_name, day_idx, station, abbr in schedule.fixed_assignments:
-        if doc_name in schedule.doctor_row:
-            row = schedule.doctor_row[doc_name]
-            col = col_for_day.get(day_idx)
-            if col is not None:
-                try:
-                    if abbr == 'PR':
-                        # PR on weekend → show station; on weekdays → show "PR"
-                        if schedule.days[day_idx].is_weekend:
-                            # Write station code (uppercase) instead of full name
-                            code = station_code_map_rev.get(station, station).upper()
-                            ws.cell(row=row, column=col).value = code
-                        else:
-                            ws.cell(row=row, column=col).value = abbr
-                    else:
-                        # For any other duty (NAZ, HD, SD, ZD, KM, SUB, etc.) write the abbreviation
-                        ws.cell(row=row, column=col).value = abbr
-                except Exception:
-                    pass
-
+        if doc_name not in schedule.doctor_row:
+            continue
+        row = schedule.doctor_row[doc_name]
+        col = col_for_day.get(day_idx)
+        if col is None:
+            continue
+        cell = ws.cell(row=row, column=col)
+        # Only write if the main loop didn't already fill this exact cell
+        # for the same doctor. This protects against a mismatch where the
+        # solver placed a different doctor on the same duty slot.
+        if cell.value is not None:
+            continue
+        try:
+            if abbr == 'PR':
+                if schedule.days[day_idx].is_weekend:
+                    code = station_code_map_rev.get(station, station).upper()
+                    cell.value = code
+                else:
+                    cell.value = abbr
+            else:
+                cell.value = abbr
+        except Exception:
+            pass
     # ========== 补偿休息日标记（浅绿色） ==========
     mark_compensatory_days(ws, schedule, assignment, duties, doctors, col_for_day, station_code_map_rev)
 
@@ -215,7 +222,13 @@ def mark_compensatory_days(
                 counts[doc_name]['HD'] += 1
             elif abbr == 'NAZ':
                 counts[doc_name]['NAZ'] += 1
-
+    # Cells already used by a fixed (wish) assignment — must not be tinted
+    fixed_assignment_cells = set()
+    for dn, di, _, _ in schedule.fixed_assignments:
+        r = schedule.doctor_row.get(dn)
+        c = col_for_day.get(di)
+        if r is not None and c is not None:
+            fixed_assignment_cells.add((r, c))
     # 2. Compute comp needed (round up for PR: 3 PR -> 2 days)
     comp_needed = {}
     for doc in doctors:
@@ -302,7 +315,11 @@ def mark_compensatory_days(
                 if col is None:
                     continue
                 cell = ws.cell(row=row, column=col)
-                if cell.value is None and (row, col) not in schedule.fixed_cells:
+                if (
+                    cell.value is None
+                    and (row, col) not in schedule.fixed_cells
+                    and (row, col) not in fixed_assignment_cells
+                ):
                     cell.fill = LIGHT_GREEN_FILL
                     station_comp_count[station][day_idx] += 1
 
@@ -324,7 +341,11 @@ def mark_compensatory_days(
                 if col is None:
                     continue
                 cell = ws.cell(row=row, column=col)
-                if cell.value is None and (row, col) not in schedule.fixed_cells:
+                if (
+                cell.value is None
+                and (row, col) not in schedule.fixed_cells
+                and (row, col) not in fixed_assignment_cells
+            ):
                     cell.fill = LIGHT_GREEN_FILL
 
 def add_compensatory_sd(

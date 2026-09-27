@@ -114,7 +114,9 @@ def build_demand(model: ScheduleModel, config: dict) -> dict:
     for day_idx, day in enumerate(model.days):
         if not day.is_weekend and day_idx not in getattr(model, 'ima_sd_days', set()):
             # Check if there is already a demand for this day? Not needed.
-            demand[(day_idx, GLOBAL_STATION)]['SD'] = 1
+            demand[(day_idx, GLOBAL_STATION)]['SD'] = max(
+                demand[(day_idx, GLOBAL_STATION)].get('SD', 0), 1
+            )
 
     # --- Merge HD duties: only one HD per day, set to GlobalHD ---
     # Collect HD demands

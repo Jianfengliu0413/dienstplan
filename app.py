@@ -295,13 +295,21 @@ with st.sidebar:
         st.session_state['config_loaded'] = True
         st.session_state['file_hashes']['rules'] = hashlib.md5(rules_file.getvalue()).hexdigest()
     
-    template_file = st.file_uploader("Template (Stationsplan)", type=["xlsx"])
+    template_file = st.file_uploader(
+        "Stationsplan (.xlsx)",
+        type=["xlsx"],
+        help="Monthly station plan template for the target month.",
+    )
     if template_file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
             tmp.write(template_file.getvalue())
-            st.session_state['template_path'] = tmp.name
-            st.session_state['file_hashes']['template'] = hashlib.md5(template_file.getvalue()).hexdigest()
-    
+            st.session_state["template_path"] = tmp.name
+            # Store the ORIGINAL filename so we can build the output name from it
+            st.session_state["template_name"] = template_file.name
+            st.session_state["file_hashes"]["template"] = hashlib.md5(
+                template_file.getvalue()
+            ).hexdigest()
+
     wishes_file = st.file_uploader("Wishes (optional)", type=["xlsx"])
     if wishes_file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:

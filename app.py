@@ -439,18 +439,17 @@ with tab1:
     #                             "Stationsplan_out.xlsx",
     #                             help="Name of the generated Excel file.",)
     # ---- Output filename (auto-generated from template + today's date) ----
-    st.markdown("#### Output")
 
     def build_default_output_name() -> str:
         """Derive default output filename from the uploaded template + today's date."""
-        template_path = st.session_state.get("template_path")
-        if template_path:
-            base = os.path.splitext(os.path.basename(template_path))[0]
+        # Prefer the original upload name (e.g. 'Stationsplan Oktober 26.xlsx')
+        template_name = st.session_state.get("template_name")
+        if template_name:
+            base = os.path.splitext(template_name)[0]
         else:
             base = "Stationsplan"
         today = datetime.now().strftime("%Y%m%d")
         return f"{base}_{today}.xlsx"
-
     # Regenerate the default whenever the template changes
     template_hash = st.session_state.get("file_hashes", {}).get("template")
     if st.session_state.get("_output_default_hash") != template_hash:

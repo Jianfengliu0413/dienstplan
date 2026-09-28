@@ -570,7 +570,7 @@ if st.session_state.get("log_output"):
         mime="text/plain",
         use_container_width=True,
     )
-    if st.session_state.get("output_file") and os.path.exists(st.session_state["output_file"]):
-        st.markdown("### Working Hours Summary")
-        df_wh = pd.read_excel(st.session_state["output_file"], sheet_name="WorkingHours")
-        st.dataframe(df_wh, use_container_width=True)
+if st.session_state.get("output_file") and os.path.exists(st.session_state["output_file"]):
+    st.markdown("### Working Hours Summary")
+    df_wh = pd.read_excel(st.session_state["output_file"], sheet_name="WorkingHours")
+    st.dataframe(df_wh, use_container_width=True)

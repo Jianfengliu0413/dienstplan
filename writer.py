@@ -16,6 +16,140 @@ ORANGE_FILL = PatternFill(start_color='F5C242', end_color='F5C242', fill_type='s
 BLUE_FILL = PatternFill(start_color='B7C5E4', end_color='B7C5E4', fill_type='solid')
 LIGHT_GREEN_FILL = PatternFill(start_color='9FCE63', end_color='9FCE63', fill_type='solid')
 
+# calculate working hours
+def write_working_hours_sheet(
+    output_path: str,
+    schedule: ScheduleModel,
+    assignment: Dict[int, str],
+    duties: List[Tuple[int, str, str]],
+    doctors: List[str],
+    config: dict,
+) -> pd.DataFrame:
+    """
+    Compute per-doctor working hours and write to a 'WorkingHours' sheet
+    inside the output workbook.
+
+    Columns:
+      Doctor, FTE %, Station, Category,
+      <DutyType> Hours  (SD/ZD/KM/HD/NAZ/PR/SUB/...),
+      Duty Hours, Weekend Hours,
+      Normal Days, Normal Hours,
+      Grand Total, Target Hours, Diff
+    """
+    import openpyxl
+
+    # ---- 0. Duty hours lookup from config ----
+    duty_hours_map = {}
+    duty_cfg = config.get('DutyTypes', pd.DataFrame())
+    if not duty_cfg.empty and 'Abbr' in duty_cfg.columns:
+        for _, row in duty_cfg.iterrows():
+            abbr = str(row['Abbr']).strip()
+            hours_val = row.get('Hours', 8.5)
+            if pd.isna(hours_val):
+                hours_val = 8.5
+            duty_hours_map[abbr] = float(hours_val)
+
+    # ---- 1. Per-doctor duty-hour breakdown ----
+    hours_by_type = {doc: defaultdict(float) for doc in doctors}
+    weekend_hours = {doc: 0.0 for doc in doctors}
+    duty_hours_total = {doc: 0.0 for doc in doctors}
+
+    for i, doc_name in assignment.items():
+        if doc_name not in hours_by_type:
+            continue
+        day_idx, station, abbr = duties[i]
+        h = duty_hours_map.get(abbr, 8.5)
+
+        hours_by_type[doc_name][abbr] += h
+        duty_hours_total[doc_name] += h
+        if schedule.days[day_idx].is_weekend:
+            weekend_hours[doc_name] += h
+
+    # ---- 2. Normal weekdays (no duty, not unavailable) ----
+    weekday_indices = [idx for idx, day in enumerate(schedule.days) if not day.is_weekend]
+    normal_hours_per_day = 8.5
+    normal_days = {doc: 0 for doc in doctors}
+
+    assigned_days = {doc: set() for doc in doctors}
+    for i, doc_name in assignment.items():
+        if doc_name in assigned_days:
+            assigned_days[doc_name].add(duties[i][0])
+
+    for doc in doctors:
+        for day_idx in weekday_indices:
+            if (doc, day_idx) in schedule.unavailable:
+                continue
+            if day_idx in assigned_days[doc]:
+                continue
+            normal_days[doc] += 1
+
+    # ---- 3. Target hours based on FTE ----
+    total_weekdays = len(weekday_indices)
+    target_hours = {
+        doc: (schedule.doctors[doc].fte / 100.0) * total_weekdays * normal_hours_per_day
+        for doc in doctors
+    }
+
+    # ---- 4. Build DataFrame ----
+    duty_types_in_model = sorted({abbr for _, _, abbr in duties})
+    preferred_order = ['SD', 'ZD', 'KM', 'HD', 'NAZ', 'PR', 'SUB']
+    ordered_types = [t for t in preferred_order if t in duty_types_in_model]
+    ordered_types += [t for t in duty_types_in_model if t not in ordered_types]
+
+    rows = []
+    for doc in doctors:
+        d = schedule.doctors[doc]
+        row = {
+            'Doctor': doc,
+            'FTE %': d.fte,
+            'Station': d.station or '',
+            'Category': d.category,
+        }
+        for t in ordered_types:
+            row[f'{t} Hours'] = round(hours_by_type[doc].get(t, 0.0), 2)
+
+        duty_total = round(duty_hours_total[doc], 2)
+        norm_h = round(normal_days[doc] * normal_hours_per_day, 2)
+        grand_total = round(duty_total + norm_h, 2)
+        target = round(target_hours[doc], 2)
+        diff = round(grand_total - target, 2)
+
+        row.update({
+            'Duty Hours': duty_total,
+            'Weekend Hours': round(weekend_hours[doc], 2),
+            'Normal Days': normal_days[doc],
+            'Normal Hours': norm_h,
+            'Grand Total': grand_total,
+            'Target Hours': target,
+            'Diff': diff,
+        })
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
+
+    # ---- 5. Add TOTAL row ----
+    numeric_cols = [c for c in df.columns if c not in (
+        'Doctor', 'FTE %', 'Station', 'Category'
+    )]
+    total_row = {c: df[c].sum() for c in numeric_cols}
+    total_row['Doctor'] = 'TOTAL'
+    df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
+
+    # ---- 6. Write to Excel sheet 'WorkingHours' (replace if exists) ----
+    try:
+        wb = openpyxl.load_workbook(output_path)
+        if 'WorkingHours' in wb.sheetnames:
+            del wb['WorkingHours']
+        wb.save(output_path)
+    except Exception:
+        pass
+
+    with pd.ExcelWriter(output_path, engine='openpyxl', mode='a') as writer:
+        df.to_excel(writer, sheet_name='WorkingHours', index=False)
+
+    print(f"[WorkingHours] wrote sheet with {len(rows)} doctors")
+    return df
+    
 def write_output(
     template_path: str,
     output_path: str,
@@ -186,6 +320,19 @@ def write_output(
     explain_df = generate_explanation(schedule, assignment, duties, doctors)
     with pd.ExcelWriter(output_path, engine='openpyxl', mode='a') as writer:
         explain_df.to_excel(writer, sheet_name='Explanation', index=False)
+    
+    # write: working hours sheet
+    try:
+        write_working_hours_sheet(
+            output_path=output_path,
+            schedule=schedule,
+            assignment=assignment,
+            duties=duties,
+            doctors=doctors,
+            config=config,
+        )
+    except Exception as e:
+        print(f"[WorkingHours] failed: {e}")
 
     wb.save(output_path)
 

@@ -477,11 +477,7 @@ Never overwrite a fixed (wish) assignment or a non-empty cell.
 
             # (d) Distance to nearest already-assigned comp day → reward spread
             if global_comp_count:
-                min_dist = min(
-                    abs(day_idx - d)
-                    for d, c in global_comp_count.items()
-                    if c > 0
-                )
+                min_dist = min(abs(day_idx - d) for d, c in global_comp_count.items() if c > 0)
             else:
                 min_dist = 999  # no anchor yet → any day fine
 

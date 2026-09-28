@@ -485,12 +485,10 @@ Never overwrite a fixed (wish) assignment or a non-empty cell.
             else:
                 min_dist = 999  # no anchor yet → any day fine
 
-            score = (
-                station_available * 1          # main: coverage
-existing_station_comp * 10   # hard: avoid same-station clash
-existing_global_comp * 5     # soft: avoid over-loaded days
-+ min_dist * 2                 # soft: prefer far-from-existing
-            )
+            score = (station_available * 1 
+                     - existing_station_comp * 10 
+                     - existing_global_comp * 5 
+                     + min_dist * 2)
             scored_days.append((day_idx, score))
 
         # Tie-break: when scores equal, prefer the LARGER day_idx

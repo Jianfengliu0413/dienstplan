@@ -563,10 +563,10 @@ with tab3:
 if st.session_state.get("log_output"):
     with st.expander("Scheduler Log", expanded=False):
         st.code(st.session_state["log_output"], language="text")
-        st.download_button(
-            "Download log",
-            data=st.session_state["log_output"].encode("utf-8"),
-            file_name="scheduler_log.txt",
-            mime="text/plain",
-            use_container_width=True,
-        )
+    st.download_button(
+        "Download log",
+        data=st.session_state["log_output"].encode("utf-8"),
+        file_name="scheduler_log.txt",
+        mime="text/plain",
+        use_container_width=True,
+    )

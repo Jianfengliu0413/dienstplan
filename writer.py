@@ -314,7 +314,8 @@ def write_output(
     conflict_df = generate_conflict_report(schedule, assignment, duties, doctors, solver)
     with pd.ExcelWriter(output_path, engine='openpyxl', mode='a') as writer:
         conflict_df.to_excel(writer, sheet_name='ConflictReport', index=False)
-
+    wb.save(output_path)
+    
     if 'Explanation' in wb.sheetnames:
         wb.remove(wb['Explanation'])
     explain_df = generate_explanation(schedule, assignment, duties, doctors)
@@ -334,7 +335,6 @@ def write_output(
     except Exception as e:
         print(f"[WorkingHours] failed: {e}")
 
-    wb.save(output_path)
 
     if suggestions_df is not None and not suggestions_df.empty:
         with pd.ExcelWriter(output_path, engine='openpyxl', mode='a') as writer:

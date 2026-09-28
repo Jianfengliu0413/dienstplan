@@ -295,13 +295,21 @@ with st.sidebar:
         st.session_state['config_loaded'] = True
         st.session_state['file_hashes']['rules'] = hashlib.md5(rules_file.getvalue()).hexdigest()
     
-    template_file = st.file_uploader("Template (Stationsplan)", type=["xlsx"])
+    template_file = st.file_uploader(
+        "Stationsplan (.xlsx)",
+        type=["xlsx"],
+        help="Monthly station plan template for the target month.",
+    )
     if template_file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
             tmp.write(template_file.getvalue())
-            st.session_state['template_path'] = tmp.name
-            st.session_state['file_hashes']['template'] = hashlib.md5(template_file.getvalue()).hexdigest()
-    
+            st.session_state["template_path"] = tmp.name
+            # Store the ORIGINAL filename so we can build the output name from it
+            st.session_state["template_name"] = template_file.name
+            st.session_state["file_hashes"]["template"] = hashlib.md5(
+                template_file.getvalue()
+            ).hexdigest()
+
     wishes_file = st.file_uploader("Wishes (optional)", type=["xlsx"])
     if wishes_file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
@@ -435,8 +443,32 @@ with tab1:
         duties = current_config.get("DutyTypes", pd.DataFrame())
         st.metric("Duty Types", len(duties))
     
-    output_file = st.text_input("Output filename", "Stationsplan_out.xlsx")
+    # output_file = st.text_input("Output filename", 
+    #                             "Stationsplan_out.xlsx",
+    #                             help="Name of the generated Excel file.",)
+    # ---- Output filename (auto-generated from template + today's date) ----
 
+    def build_default_output_name() -> str:
+        """Derive default output filename from the uploaded template + today's date."""
+        # Prefer the original upload name (e.g. 'Stationsplan Oktober 26.xlsx')
+        template_name = st.session_state.get("template_name")
+        if template_name:
+            base = os.path.splitext(template_name)[0]
+        else:
+            base = "Stationsplan"
+        today = datetime.now().strftime("%Y%m%d")
+        return f"{base}_{today}.xlsx"
+    # Regenerate the default whenever the template changes
+    template_hash = st.session_state.get("file_hashes", {}).get("template")
+    if st.session_state.get("_output_default_hash") != template_hash:
+        st.session_state["_output_default_hash"] = template_hash
+        st.session_state["output_file_input"] = build_default_output_name()
+
+    output_file = st.text_input(
+        "Output filename",
+        key="output_file_input",
+        help="Auto-generated from the template name + today's date. You can edit it.",
+    )
     # if st.button("Generate Schedule", use_container_width=True):
     #     with st.spinner("Generating schedule..."):
     #         try:

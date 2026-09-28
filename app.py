@@ -570,7 +570,19 @@ if st.session_state.get("log_output"):
         mime="text/plain",
         use_container_width=True,
     )
-if st.session_state.get("output_file") and os.path.exists(st.session_state["output_file"]):
-    st.markdown("### Working Hours Summary")
-    df_wh = pd.read_excel(st.session_state["output_file"], sheet_name="WorkingHours")
-    st.dataframe(df_wh, use_container_width=True)
+
+out_path = st.session_state.get("output_file")
+if out_path and os.path.exists(out_path):
+    try:
+        with pd.ExcelFile(out_path) as xl:
+            if "WorkingHours" in xl.sheet_names:
+                st.markdown("### Working Hours Summary")
+                df_wh = pd.read_excel(xl, sheet_name="WorkingHours")
+                st.dataframe(df_wh, use_container_width=True)
+            else:
+                st.info(
+                    "WorkingHours sheet not yet available. "
+                    f"Sheets in file: {', '.join(xl.sheet_names)}"
+                )
+    except Exception as e:
+        st.warning(f"Could not read output file: {e}")

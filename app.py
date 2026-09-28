@@ -7,7 +7,8 @@ import os
 import tempfile
 import traceback
 from datetime import datetime
-
+import shutil
+from pathlib import Path
 import pandas as pd
 import streamlit as st
 
@@ -31,7 +32,7 @@ st.set_page_config(
 # ------------------------------------------------------------------
 RULES_FILE = "Rules_edit.xlsx"
 INACTIVITY_TIMEOUT_SECONDS = 300
-
+PROJECT_ROOT = Path(__file__).resolve().parent
 
 # ------------------------------------------------------------------
 # Custom CSS
@@ -158,6 +159,28 @@ def _cleanup_session() -> None:
         _safe_unlink(st.session_state.get(key))
     st.session_state.clear()
 
+# ------------------------------------------------------------------
+# Cache cleanup
+# ------------------------------------------------------------------
+
+def _purge_pycache(root: Path = PROJECT_ROOT) -> int:
+    """
+    Recursively delete every __pycache__ directory under `root`.
+    Returns the number of directories removed.
+
+    Equivalent to:
+        find . -type d -name __pycache__ -exec rm -rf {} +
+    """
+    removed = 0
+    for pycache in root.rglob("__pycache__"):
+        if not pycache.is_dir():
+            continue
+        try:
+            shutil.rmtree(pycache, ignore_errors=True)
+            removed += 1
+        except Exception:
+            pass
+    return removed
 
 def _ensure_clean_startup() -> None:
     """
@@ -168,6 +191,11 @@ def _ensure_clean_startup() -> None:
     """
     if "initialized" in st.session_state:
         return
+
+    # purge Python bytecode caches once per session
+    n = _purge_pycache()
+    if n:
+        print(f"[startup] removed {n} __pycache__ dir(s)")
 
     _safe_unlink(RULES_FILE)
 

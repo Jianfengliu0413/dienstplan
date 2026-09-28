@@ -455,10 +455,10 @@ Never overwrite a fixed (wish) assignment or a non-empty cell.
         """Pick one day for `doc` and tint it. Returns the chosen day_idx or None."""
         if not avail_days:
             return None
-
+    
         scored_days = []
         for day_idx in avail_days:
-            # (a) Station coverage: how many other station-mates are available?
+            # (a) Station coverage
             station_available = 0
             for other_doc in doc_list:
                 if other_doc == doc:
@@ -468,36 +468,38 @@ Never overwrite a fixed (wish) assignment or a non-empty cell.
                 if (other_doc, day_idx) in schedule.unavailable:
                     continue
                 station_available += 1
-
-            # (b) Already-assigned comp at this station/day → hard penalise
+    
+            # (b) Already-assigned comp at this station/day
             existing_station_comp = station_comp_count[station][day_idx]
-
-            # (c) Already-assigned comp globally → soft penalise
-            existing_global_comp = global_comp_count[day_idx]
-
-            # (d) Distance to nearest already-assigned comp day → reward spread
-            if global_comp_count:
-                min_dist = min(abs(day_idx - d) for d, c in global_comp_count.items() if c > 0)
+    
+            # (c) Already-assigned comp globally (use .get to avoid defaultdict side effect)
+            existing_global_comp = global_comp_count.get(day_idx, 0)
+    
+            # (d) Distance to nearest *actually-used* comp day
+            existing_days = [d for d, c in global_comp_count.items() if c > 0]
+            if existing_days:
+                min_dist = min(abs(day_idx - d) for d in existing_days)
             else:
-                min_dist = 999  # no anchor yet → any day fine
-
-            score = (station_available * 1 
-                     - existing_station_comp * 10 
-                     - existing_global_comp * 5 
-                     + min_dist * 2)
+                min_dist = 999
+    
+            score = (
+                    station_available * 1
+                    - existing_station_comp * 10
+                    - existing_global_comp * 5.
+                    + min_dist * 2
+                )
             scored_days.append((day_idx, score))
-
-        # Tie-break: when scores equal, prefer the LARGER day_idx
-        # (this counters the natural "early-month first" bias).
+    
+        # Tie-break: larger day_idx on equal score (counters early-month bias)
         scored_days.sort(key=lambda x: (-x[1], -x[0]))
         chosen_day = scored_days[0][0]
-
+    
         # Write the tint
         row = schedule.doctor_row.get(doc)
         col = col_for_day.get(chosen_day)
         if row is None or col is None:
             return None
-
+    
         cell = ws.cell(row=row, column=col)
         if (
             cell.value is None
@@ -509,7 +511,6 @@ Never overwrite a fixed (wish) assignment or a non-empty cell.
             global_comp_count[chosen_day] += 1
             return chosen_day
         else:
-            # Cell not writable — skip this day without counting it.
             return None
 
     # ------------------------------------------------------------------

@@ -193,6 +193,162 @@ def write_output(
         with pd.ExcelWriter(output_path, engine='openpyxl', mode='a') as writer:
             suggestions_df.to_excel(writer, sheet_name='DayOffSuggestions', index=False)
 
+
+
+# def mark_compensatory_days(
+#     ws,
+#     schedule: ScheduleModel,
+#     assignment: Dict[int, str],
+#     duties: List[Tuple[int, str, str]],
+#     doctors: List[str],
+#     col_for_day: Dict[int, int],
+#     station_code_map_rev: Dict[str, str]
+# ):
+#     """
+#     After all assignments are written, mark compensatory days (light green)
+#     for doctors based on weekend PR (2 PR = 1 day), HD (1 day each), NAZ (1 day each).
+#     Avoid having more than one doctor from the same station taking comp on the same day,
+#     and prefer days where the station already has good coverage (fewer vacations/absences).
+#     """
+#     from openpyxl.styles import PatternFill
+#     from collections import defaultdict
+
+#     # 1. Count weekend PR, HD, NAZ per doctor
+#     counts = {doc: {'PR': 0, 'HD': 0, 'NAZ': 0} for doc in doctors}
+#     for i, doc_name in assignment.items():
+#         day_idx, station, abbr = duties[i]
+#         if schedule.days[day_idx].is_weekend:
+#             if abbr == 'PR':
+#                 counts[doc_name]['PR'] += 1
+#             elif abbr == 'HD':
+#                 counts[doc_name]['HD'] += 1
+#             elif abbr == 'NAZ':
+#                 counts[doc_name]['NAZ'] += 1
+#     # Cells already used by a fixed (wish) assignment — must not be tinted
+#     fixed_assignment_cells = set()
+#     for dn, di, _, _ in schedule.fixed_assignments:
+#         r = schedule.doctor_row.get(dn)
+#         c = col_for_day.get(di)
+#         if r is not None and c is not None:
+#             fixed_assignment_cells.add((r, c))
+#     # 2. Compute comp needed (round up for PR: 3 PR -> 2 days)
+#     comp_needed = {}
+#     for doc in doctors:
+#         pr = counts[doc]['PR']
+#         hd = counts[doc]['HD']
+#         naz = counts[doc]['NAZ']
+#         base = pr // 2 + hd + naz
+#         # If pr is odd and the base is > 0, we have a .5 that needs rounding up
+#         if pr % 2 == 1 and base > 0:
+#             comp = base + 1
+#         else:
+#             comp = base
+#         comp_needed[doc] = comp
+#     # 3. Build busy_on_day (doctors already working that day)
+#     busy_on_day = defaultdict(set)
+#     for i, doc_name in assignment.items():
+#         day_idx, _, _ = duties[i]
+#         busy_on_day[day_idx].add(doc_name)
+
+#     # 4. For each doctor, find available weekdays (no duty, not unavailable)
+#     available = {doc: [] for doc in doctors}
+#     for day_idx, day in enumerate(schedule.days):
+#         if day.is_weekend:
+#             continue
+#         for doc in doctors:
+#             if doc in busy_on_day[day_idx]:
+#                 continue
+#             if (doc, day_idx) in schedule.unavailable:
+#                 continue
+#             available[doc].append(day_idx)
+
+#     # 5. Group doctors by station
+#     station_doctors = defaultdict(list)
+#     for doc in doctors:
+#         station = schedule.doctors[doc].station
+#         if station is not None:
+#             station_doctors[station].append(doc)
+
+#     # 6. Track how many comps already assigned per station per day (max 1 per station per day)
+#     station_comp_count = defaultdict(lambda: defaultdict(int))
+
+#     # 7. For each station, process doctors with comp needs
+#     for station, doc_list in station_doctors.items():
+#         docs_needing = [doc for doc in doc_list if comp_needed.get(doc, 0) > 0]
+#         # Sort by need descending (more needy first)
+#         docs_needing.sort(key=lambda d: comp_needed[d], reverse=True)
+
+#         for doc in docs_needing:
+#             needed = comp_needed[doc]
+#             if needed <= 0:
+#                 continue
+#             avail_days = available.get(doc, [])
+#             if not avail_days:
+#                 continue
+
+#             # Score each available day: prefer days where the station has the most available doctors
+#             scored_days = []
+#             for day_idx in avail_days:
+#                 # Count how many doctors from this station are available (not working, not on vacation)
+#                 station_available = 0
+#                 for other_doc in doc_list:
+#                     if other_doc == doc:
+#                         continue
+#                     if other_doc in busy_on_day[day_idx]:
+#                         continue
+#                     if (other_doc, day_idx) in schedule.unavailable:
+#                         continue
+#                     station_available += 1
+#                 # Penalize days where this station already has a comp assigned
+#                 existing_comp = station_comp_count[station][day_idx]
+#                 score = station_available - existing_comp * 10  # strong penalty for duplicate comp
+#                 scored_days.append((day_idx, score))
+
+#             # Sort by score descending (best coverage first), then by day index
+#             scored_days.sort(key=lambda x: (-x[1], x[0]))
+#             selected_days = [day_idx for day_idx, _ in scored_days[:needed]]
+
+#             # Assign comp days
+#             for day_idx in selected_days:
+#                 row = schedule.doctor_row.get(doc)
+#                 if row is None:
+#                     continue
+#                 col = col_for_day.get(day_idx)
+#                 if col is None:
+#                     continue
+#                 cell = ws.cell(row=row, column=col)
+#                 if (
+#                     cell.value is None
+#                     and (row, col) not in schedule.fixed_cells
+#                     and (row, col) not in fixed_assignment_cells
+#                 ):
+#                     cell.fill = LIGHT_GREEN_FILL
+#                     station_comp_count[station][day_idx] += 1
+
+#     # 8. Handle doctors without a station (fallback: just take first available days)
+#     for doc in doctors:
+#         if schedule.doctors[doc].station is None:
+#             needed = comp_needed.get(doc, 0)
+#             if needed <= 0:
+#                 continue
+#             avail_days = available.get(doc, [])
+#             if not avail_days:
+#                 continue
+#             selected = avail_days[:needed]
+#             for day_idx in selected:
+#                 row = schedule.doctor_row.get(doc)
+#                 if row is None:
+#                     continue
+#                 col = col_for_day.get(day_idx)
+#                 if col is None:
+#                     continue
+#                 cell = ws.cell(row=row, column=col)
+#                 if (
+#                 cell.value is None
+#                 and (row, col) not in schedule.fixed_cells
+#                 and (row, col) not in fixed_assignment_cells
+#             ):
+#                     cell.fill = LIGHT_GREEN_FILL
 def mark_compensatory_days(
     ws,
     schedule: ScheduleModel,
@@ -205,13 +361,20 @@ def mark_compensatory_days(
     """
     After all assignments are written, mark compensatory days (light green)
     for doctors based on weekend PR (2 PR = 1 day), HD (1 day each), NAZ (1 day each).
-    Avoid having more than one doctor from the same station taking comp on the same day,
-    and prefer days where the station already has good coverage (fewer vacations/absences).
+
+    Rules:
+At most 1 doctor from the same station can take comp on the same day.
+Prefer days where the station has good coverage (many available doctors).
+Prefer days that are far from other already-assigned comp days
+        (temporal spread across the month).
+Never overwrite a fixed (wish) assignment or a non-empty cell.
     """
     from openpyxl.styles import PatternFill
     from collections import defaultdict
 
-    # 1. Count weekend PR, HD, NAZ per doctor
+    # ------------------------------------------------------------------
+    # 1. Count weekend PR / HD / NAZ per doctor
+    # ------------------------------------------------------------------
     counts = {doc: {'PR': 0, 'HD': 0, 'NAZ': 0} for doc in doctors}
     for i, doc_name in assignment.items():
         day_idx, station, abbr = duties[i]
@@ -222,6 +385,7 @@ def mark_compensatory_days(
                 counts[doc_name]['HD'] += 1
             elif abbr == 'NAZ':
                 counts[doc_name]['NAZ'] += 1
+
     # Cells already used by a fixed (wish) assignment — must not be tinted
     fixed_assignment_cells = set()
     for dn, di, _, _ in schedule.fixed_assignments:
@@ -229,26 +393,34 @@ def mark_compensatory_days(
         c = col_for_day.get(di)
         if r is not None and c is not None:
             fixed_assignment_cells.add((r, c))
-    # 2. Compute comp needed (round up for PR: 3 PR -> 2 days)
+
+    # ------------------------------------------------------------------
+    # 2. Compute comp days needed per doctor
+    #    (round up for odd PR: 3 PR -> 2 days, 5 PR -> 3 days, ...)
+    # ------------------------------------------------------------------
     comp_needed = {}
     for doc in doctors:
         pr = counts[doc]['PR']
         hd = counts[doc]['HD']
         naz = counts[doc]['NAZ']
         base = pr // 2 + hd + naz
-        # If pr is odd and the base is > 0, we have a .5 that needs rounding up
         if pr % 2 == 1 and base > 0:
             comp = base + 1
         else:
             comp = base
         comp_needed[doc] = comp
-    # 3. Build busy_on_day (doctors already working that day)
+
+    # ------------------------------------------------------------------
+    # 3. Busy days per doctor (already has a duty)
+    # ------------------------------------------------------------------
     busy_on_day = defaultdict(set)
     for i, doc_name in assignment.items():
         day_idx, _, _ = duties[i]
         busy_on_day[day_idx].add(doc_name)
 
-    # 4. For each doctor, find available weekdays (no duty, not unavailable)
+    # ------------------------------------------------------------------
+    # 4. Available weekdays per doctor
+    # ------------------------------------------------------------------
     available = {doc: [] for doc in doctors}
     for day_idx, day in enumerate(schedule.days):
         if day.is_weekend:
@@ -260,94 +432,196 @@ def mark_compensatory_days(
                 continue
             available[doc].append(day_idx)
 
+    # ------------------------------------------------------------------
     # 5. Group doctors by station
+    # ------------------------------------------------------------------
     station_doctors = defaultdict(list)
     for doc in doctors:
         station = schedule.doctors[doc].station
         if station is not None:
             station_doctors[station].append(doc)
 
-    # 6. Track how many comps already assigned per station per day (max 1 per station per day)
+    # ------------------------------------------------------------------
+    # 6. Per-station per-day comp counter (max 1 per station per day)
+    #    and global per-day comp counter (for temporal spread)
+    # ------------------------------------------------------------------
     station_comp_count = defaultdict(lambda: defaultdict(int))
+    global_comp_count = defaultdict(int)
 
-    # 7. For each station, process doctors with comp needs
+    # ------------------------------------------------------------------
+    # 7. Helper: pick the best day for `doc` from `avail_days`, then assign
+    # ------------------------------------------------------------------
+    def assign_one_comp(doc, avail_days, station, doc_list):
+        """Pick one day for `doc` and tint it. Returns the chosen day_idx or None."""
+        if not avail_days:
+            return None
+
+        scored_days = []
+        for day_idx in avail_days:
+            # (a) Station coverage: how many other station-mates are available?
+            station_available = 0
+            for other_doc in doc_list:
+                if other_doc == doc:
+                    continue
+                if other_doc in busy_on_day[day_idx]:
+                    continue
+                if (other_doc, day_idx) in schedule.unavailable:
+                    continue
+                station_available += 1
+
+            # (b) Already-assigned comp at this station/day → hard penalise
+            existing_station_comp = station_comp_count[station][day_idx]
+
+            # (c) Already-assigned comp globally → soft penalise
+            existing_global_comp = global_comp_count[day_idx]
+
+            # (d) Distance to nearest already-assigned comp day → reward spread
+            if global_comp_count:
+                min_dist = min(
+                    abs(day_idx - d)
+                    for d, c in global_comp_count.items()
+                    if c > 0
+                )
+            else:
+                min_dist = 999  # no anchor yet → any day fine
+
+            score = (
+                station_available * 1          # main: coverage
+existing_station_comp * 10   # hard: avoid same-station clash
+existing_global_comp * 5     # soft: avoid over-loaded days
++ min_dist * 2                 # soft: prefer far-from-existing
+            )
+            scored_days.append((day_idx, score))
+
+        # Tie-break: when scores equal, prefer the LARGER day_idx
+        # (this counters the natural "early-month first" bias).
+        scored_days.sort(key=lambda x: (-x[1], -x[0]))
+        chosen_day = scored_days[0][0]
+
+        # Write the tint
+        row = schedule.doctor_row.get(doc)
+        col = col_for_day.get(chosen_day)
+        if row is None or col is None:
+            return None
+
+        cell = ws.cell(row=row, column=col)
+        if (
+            cell.value is None
+            and (row, col) not in schedule.fixed_cells
+            and (row, col) not in fixed_assignment_cells
+        ):
+            cell.fill = LIGHT_GREEN_FILL
+            station_comp_count[station][chosen_day] += 1
+            global_comp_count[chosen_day] += 1
+            return chosen_day
+        else:
+            # Cell not writable — skip this day without counting it.
+            return None
+
+    # ------------------------------------------------------------------
+    # 8. Assign comp days for doctors WITH a station
+    # ------------------------------------------------------------------
     for station, doc_list in station_doctors.items():
         docs_needing = [doc for doc in doc_list if comp_needed.get(doc, 0) > 0]
-        # Sort by need descending (more needy first)
+        # More needy first (stable order)
         docs_needing.sort(key=lambda d: comp_needed[d], reverse=True)
 
         for doc in docs_needing:
             needed = comp_needed[doc]
-            if needed <= 0:
-                continue
-            avail_days = available.get(doc, [])
+            avail_days = list(available.get(doc, []))
             if not avail_days:
                 continue
 
-            # Score each available day: prefer days where the station has the most available doctors
-            scored_days = []
-            for day_idx in avail_days:
-                # Count how many doctors from this station are available (not working, not on vacation)
-                station_available = 0
-                for other_doc in doc_list:
-                    if other_doc == doc:
-                        continue
-                    if other_doc in busy_on_day[day_idx]:
-                        continue
-                    if (other_doc, day_idx) in schedule.unavailable:
-                        continue
-                    station_available += 1
-                # Penalize days where this station already has a comp assigned
-                existing_comp = station_comp_count[station][day_idx]
-                score = station_available - existing_comp * 10  # strong penalty for duplicate comp
-                scored_days.append((day_idx, score))
-
-            # Sort by score descending (best coverage first), then by day index
-            scored_days.sort(key=lambda x: (-x[1], x[0]))
-            selected_days = [day_idx for day_idx, _ in scored_days[:needed]]
-
-            # Assign comp days
-            for day_idx in selected_days:
-                row = schedule.doctor_row.get(doc)
-                if row is None:
+            assigned = 0
+            # Try until we assign `needed` days or run out of candidates
+            attempts = 0
+            max_attempts = needed * 3  # allow a few retries on non-writable cells
+            while assigned < needed and avail_days and attempts < max_attempts:
+                attempts += 1
+                chosen = assign_one_comp(doc, avail_days, station, doc_list)
+                if chosen is None:
+                    # The best day was not writable — remove it and retry
+                    # Find the day with the best score to drop it
+                    # (we simply drop the first day that got the top score)
+                    # To keep it simple, we pop the day the previous call would
+                    # have picked.
+                    # Fallback: drop the first available day.
+                    avail_days.pop(0)
                     continue
-                col = col_for_day.get(day_idx)
-                if col is None:
-                    continue
-                cell = ws.cell(row=row, column=col)
-                if (
-                    cell.value is None
-                    and (row, col) not in schedule.fixed_cells
-                    and (row, col) not in fixed_assignment_cells
-                ):
-                    cell.fill = LIGHT_GREEN_FILL
-                    station_comp_count[station][day_idx] += 1
+                avail_days.remove(chosen)
+                assigned += 1
 
-    # 8. Handle doctors without a station (fallback: just take first available days)
+            if assigned < needed:
+                print(
+                    f"[comp] {doc}: could only assign {assigned}/{needed} "
+                    f"compensatory days (station={station})"
+                )
+
+    # ------------------------------------------------------------------
+    # 9. Doctors WITHOUT a station (fallback): spread by distance too
+    # ------------------------------------------------------------------
     for doc in doctors:
-        if schedule.doctors[doc].station is None:
-            needed = comp_needed.get(doc, 0)
-            if needed <= 0:
+        if schedule.doctors[doc].station is not None:
+            continue
+        needed = comp_needed.get(doc, 0)
+        if needed <= 0:
+            continue
+        avail_days = list(available.get(doc, []))
+        if not avail_days:
+            continue
+
+        assigned = 0
+        attempts = 0
+        max_attempts = needed * 3
+        while assigned < needed and avail_days and attempts < max_attempts:
+            attempts += 1
+
+            if global_comp_count:
+                chosen_day = max(
+                    avail_days,
+                    key=lambda d: min(
+                        abs(d - cd)
+                        for cd, c in global_comp_count.items()
+                        if c > 0
+                    ),
+                )
+            else:
+                # No anchors yet → start from the middle of the month
+                chosen_day = avail_days[len(avail_days) // 2]
+
+            row = schedule.doctor_row.get(doc)
+            col = col_for_day.get(chosen_day)
+            if row is None or col is None:
+                avail_days.remove(chosen_day)
                 continue
-            avail_days = available.get(doc, [])
-            if not avail_days:
-                continue
-            selected = avail_days[:needed]
-            for day_idx in selected:
-                row = schedule.doctor_row.get(doc)
-                if row is None:
-                    continue
-                col = col_for_day.get(day_idx)
-                if col is None:
-                    continue
-                cell = ws.cell(row=row, column=col)
-                if (
+
+            cell = ws.cell(row=row, column=col)
+            if (
                 cell.value is None
                 and (row, col) not in schedule.fixed_cells
                 and (row, col) not in fixed_assignment_cells
             ):
-                    cell.fill = LIGHT_GREEN_FILL
+                cell.fill = LIGHT_GREEN_FILL
+                global_comp_count[chosen_day] += 1
+                assigned += 1
+            avail_days.remove(chosen_day)
 
+    # ------------------------------------------------------------------
+    # 10. Debug: print comp day distribution across the month
+    # ------------------------------------------------------------------
+    if global_comp_count:
+        total_days = len(schedule.days)
+        half = total_days // 2
+        first_half = sum(c for d, c in global_comp_count.items() if d < half)
+        second_half = sum(c for d, c in global_comp_count.items() if d >= half)
+        print("\n=== Compensatory days distribution ===")
+        print(f"  Total comp days: {sum(global_comp_count.values())}")
+        print(f"  First half of month: {first_half}")
+        print(f"  Second half of month: {second_half}")
+        # Optional detailed dump (commented out to keep logs short):
+        # for d in sorted(global_comp_count):
+        #     day = schedule.days[d]
+        #     print(f"    {day.date.strftime('%Y-%m-%d (%a)')}: {global_comp_count[d]}")
 def add_compensatory_sd(
     ws,
     schedule: ScheduleModel,

@@ -492,17 +492,7 @@ with tab1:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---- Log (inside Run tab) ----
-    if st.session_state.get("log_output"):
-        with st.expander("Scheduler Log", expanded=False):
-            st.code(st.session_state["log_output"], language="text")
-            st.download_button(
-                "Download log",
-                data=st.session_state["log_output"].encode("utf-8"),
-                file_name="scheduler_log.txt",
-                mime="text/plain",
-                use_container_width=True,
-            )
+
 
 
 # ==================================================================
@@ -567,3 +557,32 @@ with tab3:
         unsafe_allow_html=True,
     )
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ---- Log (inside Run tab) ----
+if st.session_state.get("log_output"):
+    with st.expander("Scheduler Log", expanded=False):
+        st.code(st.session_state["log_output"], language="text")
+    st.download_button(
+        "Download log",
+        data=st.session_state["log_output"].encode("utf-8"),
+        file_name="scheduler_log.txt",
+        mime="text/plain",
+        use_container_width=True,
+    )
+
+out_path = st.session_state.get("output_file")
+if out_path and os.path.exists(out_path):
+    try:
+        with pd.ExcelFile(out_path) as xl:
+            if "WorkingHours" in xl.sheet_names:
+                st.markdown("### Working Hours Summary")
+                df_wh = pd.read_excel(xl, sheet_name="WorkingHours")
+                st.dataframe(df_wh, use_container_width=True)
+            else:
+                st.info(
+                    "WorkingHours sheet not yet available. "
+                    f"Sheets in file: {', '.join(xl.sheet_names)}"
+                )
+    except Exception as e:
+        st.warning(f"Could not read output file: {e}")

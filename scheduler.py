@@ -562,10 +562,11 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
     except (AttributeError, TypeError):
         obj = "N/A (repair)"
     print(f"Objective value: {obj}")
-    try:
-        visualize_schedule(schedule, assignment, duties, doctors, output_file.replace('.xlsx', ''))
-    except Exception as e:
-        print(f"Visualization failed: {e}")
+    # do not do visualize
+    # try:
+    #     visualize_schedule(schedule, assignment, duties, doctors, output_file.replace('.xlsx', ''))
+    # except Exception as e:
+    #     print(f"Visualization failed: {e}")
     return output_file
  
 def run_scheduler(template_path, output_path, config_path, wishes_path=None, config_dict=None):

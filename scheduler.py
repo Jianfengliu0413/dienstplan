@@ -817,7 +817,7 @@ def run_scheduler(template_path, output_path, config_path, wishes_path=None, con
         raise e
     finally:
         sys.stdout = sys.__stdout__
-    return success, log_capture.getvalue()
+    return success, log_capture.getvalue(), schedule
 
 
 if __name__ == '__main__':

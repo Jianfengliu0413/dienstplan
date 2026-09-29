@@ -19,6 +19,7 @@ import sys
 import tempfile
 from io import StringIO
 from typing import List, Tuple, Dict
+RULES_FILE= 'Rules_updated.xlsx'
 
 def create_default_config(config_path: str):
     """Generate a default Rules.xlsx with sample data."""
@@ -708,7 +709,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
         if (missing_skills or missing_demand) and not other_errors:
             # print("Configuration incomplete: missing skills and/or station duty counts.")
             # print("Generating missing sheets with detected doctors and stations...")
-            # write_missing_config_sheets(schedule, config_path)
+            write_missing_config_sheets(schedule, RULES_FILE)
             # write_skills_auto(schedule, config_path)
             # print("\nPlease open Rules.xlsx and fill in:")
             # print("  - Skills sheet: assign each doctor their duty types (SD, ZD, KM, etc.)")

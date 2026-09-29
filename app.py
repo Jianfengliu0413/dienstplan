@@ -30,7 +30,7 @@ st.set_page_config(
 # ------------------------------------------------------------------
 # Constants
 # ------------------------------------------------------------------
-RULES_FILE = "Rules_edit.xlsx"
+RULES_FILE = "Rules_updated.xlsx"
 INACTIVITY_TIMEOUT_SECONDS = 300
 PROJECT_ROOT = Path(__file__).resolve().parent
 
@@ -558,7 +558,7 @@ with tab3:
                 st.download_button(
                     "Download Updated Rules",
                     data=f,
-                    file_name="Rules_updated.xlsx",
+                    file_name=RULES_FILE,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
                 )

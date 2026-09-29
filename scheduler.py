@@ -22,9 +22,7 @@ from typing import List, Tuple, Dict
 
 from demand_builder import MAIN_STATIONS
 
-
-
-RULES_FILE = 'Rules_edit.xlsx' 
+RULES_FILE = 'Rules_updated.xlsx' 
 
 
 def _read_existing_sheet(config_path, sheet_name):

@@ -213,23 +213,50 @@ def add_soft_constraints(
  
 
     # 8. SD balance — even distribution, no truncation
+    # sd_weight = int(penalties_cfg.get('SDBalance', 20))
+    # if sd_weight != 0 and num_doctors > 0:
+    #     sd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'SD']
+    #     if sd_indices:
+    #         K = len(sd_indices)
+    #         floor_val = K // num_doctors
+    #         ceil_val = (K + num_doctors - 1) // num_doctors
+    #         for j in range(num_doctors):
+    #             sd_assigned = model_cp.NewIntVar(0, K, f'sd_{j}')
+    #             model_cp.Add(sd_assigned == sum(x_vars[(i, j)] for i in sd_indices))
+    #             over = model_cp.NewIntVar(0, K, f'sd_over_{j}')
+    #             under = model_cp.NewIntVar(0, K, f'sd_under_{j}')
+    #             model_cp.Add(sd_assigned - ceil_val <= over)
+    #             model_cp.Add(floor_val - sd_assigned <= under)
+    #             penalties.append(sd_weight * over)
+    #             penalties.append(sd_weight * under)
+
+    # 8. SD balance — even distribution, no truncation
     sd_weight = int(penalties_cfg.get('SDBalance', 20))
     if sd_weight != 0 and num_doctors > 0:
         sd_indices = [i for i, (_, _, abbr) in enumerate(duties) if abbr == 'SD']
         if sd_indices:
+            sd_eligible = [
+                j for j, doc_name in enumerate(doctors)
+                if 'SD' in schedule.doctors[doc_name].skills
+            ]
+            if not sd_eligible:
+                sd_eligible = list(range(num_doctors))
             K = len(sd_indices)
-            floor_val = K // num_doctors
-            ceil_val = (K + num_doctors - 1) // num_doctors
-            for j in range(num_doctors):
+            N = len(sd_eligible)
+            avg_x100 = int(round((K / N) * 100))
+
+            for j in sd_eligible:
                 sd_assigned = model_cp.NewIntVar(0, K, f'sd_{j}')
                 model_cp.Add(sd_assigned == sum(x_vars[(i, j)] for i in sd_indices))
-                over = model_cp.NewIntVar(0, K, f'sd_over_{j}')
-                under = model_cp.NewIntVar(0, K, f'sd_under_{j}')
-                model_cp.Add(sd_assigned - ceil_val <= over)
-                model_cp.Add(floor_val - sd_assigned <= under)
-                penalties.append(sd_weight * over)
-                penalties.append(sd_weight * under)
- 
+                
+                scaled = model_cp.NewIntVar(0, K * 100, f'sd_scaled_{j}')
+                model_cp.Add(scaled == sd_assigned * 100)
+                
+                dev = model_cp.NewIntVar(0, K * 100, f'sd_dev_{j}')
+                model_cp.AddAbsEquality(dev, scaled - avg_x100)
+                
+                penalties.append(sd_weight * dev)
+
     # ZD balance — even distribution, no truncation
     zd_weight = int(penalties_cfg.get('ZDBalance', 0))
     if zd_weight != 0 and num_doctors > 0:

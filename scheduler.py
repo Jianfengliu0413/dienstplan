@@ -19,7 +19,196 @@ import sys
 import tempfile
 from io import StringIO
 from typing import List, Tuple, Dict
-RULES_FILE= 'Rules_updated.xlsx'
+
+from demand_builder import MAIN_STATIONS
+
+
+
+RULES_FILE = 'Rules_edit.xlsx' 
+
+
+def _read_existing_sheet(config_path, sheet_name):
+    """安全读取一个 sheet,失败返回 None"""
+    try:
+        return pd.read_excel(config_path, sheet_name=sheet_name)
+    except Exception:
+        return None
+
+
+def _merge_doctors(existing_df, detected_doctors):
+    """合并用户 Doctors 与 template 检测结果。"""
+    existing_rows = {}
+    if existing_df is not None and not existing_df.empty:
+        for _, row in existing_df.iterrows():
+            name = str(row.get('Name', '')).strip()
+            if name:
+                existing_rows[name] = row.to_dict()
+
+    merged = []
+    for detected in detected_doctors:
+        name = detected['Name']
+        if name in existing_rows:
+            u = existing_rows[name]
+            merged.append({
+                'Name': name,
+                'FTE (%)': u.get('FTE (%)', detected['FTE (%)']) or detected['FTE (%)'],
+                'Station': u.get('Station', detected['Station']) or detected['Station'],
+                'Active': u.get('Active', detected['Active']) or detected['Active'],
+                'Weekend': u.get('Weekend', detected['Weekend']) or detected['Weekend'],
+                'Allow92KMT': u.get('Allow92KMT', detected['Allow92KMT']) or detected['Allow92KMT'],
+                'AllowNAZ': u.get('AllowNAZ', detected['AllowNAZ']) or detected['AllowNAZ'],
+            })
+        else:
+            merged.append(detected)
+
+    detected_names = {d['Name'] for d in detected_doctors}
+    for name, u in existing_rows.items():
+        if name not in detected_names:
+            merged.append(u)
+
+    return pd.DataFrame(merged)
+
+
+def _infer_allow_92_kmt(doc):
+    if doc.fte < 100 or not doc.weekend_available:
+        return 'No'
+    if doc.station == '92 KMT':
+        return 'Yes'
+    return 'No'
+
+
+def _infer_allow_naz(doc):
+    if 'NAZ' in doc.skills and doc.fte >= 100 and doc.weekend_available:
+        return 'Yes'
+    return 'No'
+
+
+def write_missing_config_sheets(model, config_path):
+    """
+    Merge auto-detected doctors/stations into Rules file.
+    Preserves user's existing settings (Active, Weekend, Allow92KMT, AllowNAZ, etc.).
+    Also writes '-Auto' snapshot for reference.
+    """
+    # ---- 1. Read existing sheets (to preserve user edits) ----
+    existing_stations_df = _read_existing_sheet(config_path, 'Stations')
+    existing_doctors_df = _read_existing_sheet(config_path, 'Doctors')
+
+    existing_stations = {}
+    if existing_stations_df is not None:
+        for _, row in existing_stations_df.iterrows():
+            name = str(row.get('Station', '')).strip()
+            if name:
+                existing_stations[name] = {
+                    'RequiresSenior': str(row.get('RequiresSenior', 'No')).strip(),
+                    'WeekdayDutyCounts': str(row.get('WeekdayDutyCounts', '')).strip(),
+                    'WeekendDutyCounts': str(row.get('WeekendDutyCounts', '')).strip(),
+                }
+
+    # ---- 2. Merge stations ----
+    stations_data = []
+    for name in sorted(model.found_station_names):
+        if name in existing_stations:
+            e = existing_stations[name]
+            stations_data.append([name, e['RequiresSenior'], e['WeekdayDutyCounts'], e['WeekendDutyCounts']])
+        else:
+            weekend = 'PR=1' if name in MAIN_STATIONS else ''
+            stations_data.append([name, 'No', '', weekend])
+
+    for name, e in existing_stations.items():
+        if name not in model.found_station_names:
+            stations_data.append([name, e['RequiresSenior'], e['WeekdayDutyCounts'], e['WeekendDutyCounts']])
+    df_stations = pd.DataFrame(stations_data, columns=['Station', 'RequiresSenior', 'WeekdayDutyCounts', 'WeekendDutyCounts'])
+
+    # ---- 3. Merge doctors (with Allow92KMT / AllowNAZ) ----
+    existing_doctors_lookup = {}
+    if existing_doctors_df is not None:
+        for _, row in existing_doctors_df.iterrows():
+            name = str(row.get('Name', '')).strip()
+            if name:
+                existing_doctors_lookup[name] = row.to_dict()
+
+    detected_doctors = []
+    for doc in model.doctors.values():
+        user = existing_doctors_lookup.get(doc.name, {})
+        active_default = getattr(model, '_active_override', {}).get(doc.name, 'Yes')
+        weekend_default = getattr(model, '_weekend_override', {}).get(doc.name, 'Yes')
+
+        allow_92 = str(user.get('Allow92KMT', '')).strip()
+        if allow_92.upper() not in ('YES', 'NO'):
+            allow_92 = _infer_allow_92_kmt(doc)
+        allow_naz = str(user.get('AllowNAZ', '')).strip()
+        if allow_naz.upper() not in ('YES', 'NO'):
+            allow_naz = _infer_allow_naz(doc)
+
+        detected_doctors.append({
+            'Name': doc.name,
+            'FTE (%)': doc.fte,
+            'Station': doc.station,
+            'Active': active_default,
+            'Weekend': weekend_default,
+            'Allow92KMT': allow_92,
+            'AllowNAZ': allow_naz,
+        })
+
+    if hasattr(model, '_inactive_doctors'):
+        for name, info in model._inactive_doctors.items():
+            user = existing_doctors_lookup.get(name, {})
+            allow_92 = str(user.get('Allow92KMT', 'No')).strip() or 'No'
+            allow_naz = str(user.get('AllowNAZ', 'No')).strip() or 'No'
+            detected_doctors.append({
+                'Name': name,
+                'FTE (%)': info['fte'],
+                'Station': info['station'],
+                'Active': info['active'],
+                'Weekend': info['weekend'],
+                'Allow92KMT': allow_92,
+                'AllowNAZ': allow_naz,
+            })
+
+    df_doctors = _merge_doctors(existing_doctors_df, detected_doctors)
+
+    # ---- 4. Skills ----
+    skills_data = []
+    for doc_name, doc in model.doctors.items():
+        for duty in sorted(doc.skills):
+            skills_data.append([doc_name, duty])
+    df_skills = pd.DataFrame(skills_data, columns=['Doctor', 'DutyType'])
+
+    # ---- 5. DutyTypes ----
+    duty_data = []
+    for abbr, dt in model.duty_types.items():
+        duty_data.append([
+            abbr, dt.fullname,
+            'Yes' if dt.requires_senior else 'No',
+            'Yes' if dt.weekend_only else 'No',
+            dt.priority, dt.hours,
+        ])
+    df_duty = pd.DataFrame(duty_data, columns=['Abbr', 'FullName', 'RequiresSenior', 'WeekendOnly', 'Priority', 'Hours'])
+
+    # ---- 6. Write BOTH the real sheet and the -Auto snapshot ----
+    sheets_to_write = [
+        ('Doctors', df_doctors),
+        ('Doctors-Auto', df_doctors),
+        ('Stations', df_stations),
+        ('Stations-Auto', df_stations),
+        ('Skills-Auto', df_skills),
+        ('DutyTypes-Auto', df_duty),
+    ]
+    for sheet_name, df in sheets_to_write:
+        try:
+            with pd.ExcelWriter(config_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+        except Exception as e:
+            print(f"[write_missing_config_sheets] failed '{sheet_name}': {e}")
+
+    print(f"[config] Updated Doctors ({len(df_doctors)}), Stations ({len(df_stations)}), Skills ({len(df_skills)})")
+
+
+
+
+
+
+    
 
 def create_default_config(config_path: str):
     """Generate a default Rules.xlsx with sample data."""
@@ -162,362 +351,7 @@ def get_default_station_code_map() -> pd.DataFrame:
     ]
     return pd.DataFrame(data, columns=["Code", "Station"])
 
-def write_missing_config_sheets(model, config_path):
-    """
-    Write auto-generated Doctors/Stations/etc. sheets as "<name>-Auto",
-    leaving the original user-edited sheets untouched.
-
-    Sheets produced:
-
-    ◦ Doctors-Auto.
-    ◦ Stations-Auto.
-    ◦ Skills-Auto.
-    ◦ DutyTypes-Auto.
-    ◦ StationCodeMap-Auto.
-    ◦ GeneralRules-Auto.
-    ◦ Penalties-Auto.
-    ◦ Constraints-Auto.
-    ◦ Preferences-Auto.
-    ◦ SpecialWeekendDays-Auto.
-    ◦ OutputOptions-Auto. 
-
-    Original sheets (Doctors, Stations, Skills, ...) are NEVER modified.
-    Use "-Auto" as a reference to copy values into the real sheets,
-    or to review what the template parser detected.
-    """
-    from openpyxl import load_workbook
-    import pandas as pd
-
-    # --------------------------------------------------------------
-    # 1. Load existing Stations to preserve user-entered DutyCounts
-    # --------------------------------------------------------------
-    existing_stations = {}
-    try:
-        df_existing = pd.read_excel(config_path, sheet_name='Stations')
-        for _, row in df_existing.iterrows():
-            name = str(row['Station']).strip()
-            weekday = str(row.get('WeekdayDutyCounts', '')).strip()
-            weekend = str(row.get('WeekendDutyCounts', '')).strip()
-            if weekday == 'nan':
-                weekday = ''
-            if weekend == 'nan':
-                weekend = ''
-            existing_stations[name] = (weekday, weekend)
-    except Exception:
-        pass
-
-    # --------------------------------------------------------------
-    # 2. Merge detected stations with existing ones
-    # --------------------------------------------------------------
-    new_stations = {}
-    for station_name in sorted(model.found_station_names):
-        if station_name in existing_stations:
-            weekday, weekend = existing_stations[station_name]
-        else:
-            weekday = ''
-            if station_name in ['65 LAF', '65 PP', '85 Häm/Onk/Rheu', '92 KMT']:
-                weekend = 'PR=1'
-            else:
-                weekend = ''
-        new_stations[station_name] = (weekday, weekend)
-
-    # Keep existing stations not in the template (so nothing is lost)
-    for name, (weekday, weekend) in existing_stations.items():
-        if name not in new_stations:
-            new_stations[name] = (weekday, weekend)
-
-    stations_data = []
-    for name, (weekday, weekend) in sorted(new_stations.items()):
-        stations_data.append([name, 'No', weekday, weekend])
-    df_stations = pd.DataFrame(
-        stations_data,
-        columns=['Station', 'RequiresSenior',
-                 'WeekdayDutyCounts', 'WeekendDutyCounts'],
-    )
-
-    # --------------------------------------------------------------
-    # 3. Prepare Doctors data
-    # --------------------------------------------------------------
-    doctors_data = []
-    for doc in model.doctors.values():
-        name = doc.name
-        active = getattr(model, '_active_override', {}).get(name, 'Yes')
-        weekend = getattr(model, '_weekend_override', {}).get(name, 'Yes')
-        doctors_data.append([name, doc.fte, doc.station, active, weekend])
-
-    if hasattr(model, '_inactive_doctors'):
-        for name, info in model._inactive_doctors.items():
-            doctors_data.append([
-                name,
-                info['fte'],
-                info['station'],
-                info['active'],
-                info['weekend'],
-            ])
-    df_doctors = pd.DataFrame(
-        doctors_data,
-        columns=['Name', 'FTE (%)', 'Station', 'Active', 'Weekend'],
-    )
-
-    # --------------------------------------------------------------
-    # 4. Prepare Skills-Auto (long format: Doctor, DutyType)
-    # --------------------------------------------------------------
-    skills_data = []
-    for doc_name, doc in model.doctors.items():
-        for duty in sorted(doc.skills):
-            skills_data.append([doc_name, duty])
-    df_skills = pd.DataFrame(skills_data, columns=['Doctor', 'DutyType'])
-
-    # --------------------------------------------------------------
-    # 5. Prepare DutyTypes
-    # --------------------------------------------------------------
-    duty_data = []
-    for abbr, dt in model.duty_types.items():
-        duty_data.append([
-            abbr,
-            dt.fullname,
-            'Yes' if dt.requires_senior else 'No',
-            'Yes' if dt.weekend_only else 'No',
-            dt.priority,
-        ])
-    df_duty = pd.DataFrame(
-        duty_data,
-        columns=['Abbr', 'FullName', 'RequiresSenior',
-                 'WeekendOnly', 'Priority'],
-    )
-
-    # --------------------------------------------------------------
-    # 6. Prepare StationCodeMap
-    # --------------------------------------------------------------
-    df_map = get_default_station_code_map()
-
-    # --------------------------------------------------------------
-    # 7. Defaults for other sheets
-    # --------------------------------------------------------------
-    required_sheets = {
-        'GeneralRules-Auto': pd.DataFrame({
-            'RuleName': ['MaxConsecutiveWorkDays',
-                         'MaxDutiesPerWeek',
-                         'MainDoctorMaxWeekend'],
-            'Value': [6, 5, 1],
-        }),
-        'Penalties-Auto': pd.DataFrame({
-            'Penalty': [
-                'Preference', 'WorkloadBalance', 'WeekendBalance',
-                'WeekendFairness', 'PRBalance', 'WeekendPairingReward',
-                'WeekendSinglePenalty', 'WeekendHomeStationBonus',
-                'KMBalance', 'CrossStation', 'DayOffPenalty',
-                'SDBalance', 'ZDBalance', 'ZDConsecutiveReward',
-                'BridgeDay', 'MainCategoryReward', 'JumperCategoryReward',
-                'Penalty92KMT', 'PenaltyNAZ',
-            ],
-            'Weight': [
-                10, 3000, 2000,
-                5000, 400, 200,
-                100, 300,
-                10, 50, 60,
-                1500, 2000, 10,
-                10, 120, 30,
-                100, 100,
-            ],
-        }),
-        'Constraints-Auto': pd.DataFrame({
-            'Constraint': [
-                'MaxConsecutive', 'MaxPerWeek', 'WeekendOnly',
-                'SeniorRequired', 'WeekendAvailability',
-                'WeekendOnlyFullTime', 'WeekendOnlyForSkilled',
-                'MaxWeekendPR', 'MaxOneWeekendPerDoctor',
-                'MaxHouseShifts', 'MaxSD', 'MaxZD', 'MaxNAZ',
-                'MainDoctorMaxOneWeekend',
-            ],
-            'Enabled': [
-                'Yes', 'Yes', 'No',
-                'Yes', 'Yes',
-                'Yes', 'No',
-                'Yes', 'Yes',
-                'Yes', 'Yes', 'Yes', 'Yes',
-                'Yes',
-            ],
-        }),
-        'Preferences-Auto': pd.DataFrame(
-            columns=['Doctor', 'Day', 'DutyType', 'Priority']
-        ),
-        'SpecialWeekendDays-Auto': pd.DataFrame(
-            columns=['Date', 'Description']
-        ),
-        'OutputOptions-Auto': pd.DataFrame({
-            'Option': ['IncludeStatistics',
-                       'IncludeConflictReport',
-                       'IncludeExplanation'],
-            'Value': ['Yes', 'Yes', 'Yes'],
-        }),
-    }
-
-    # --------------------------------------------------------------
-    # 8. Build thesheet_name, DataFrame) to write
-    # --------------------------------------------------------------
-    sheets_to_write = [
-        ('Doctors-Auto', df_doctors),
-        ('Stations-Auto', df_stations),
-        ('Skills-Auto', df_skills),
-        ('DutyTypes-Auto', df_duty),
-        ('StationCodeMap-Auto', df_map),
-    ]
-    for name, df in required_sheets.items():
-        sheets_to_write.append((name, df))
-
-    # --------------------------------------------------------------
-    # 9. Write everything with if_sheet_exists='replace'
-    #    Original sheets (Doctors, Stations, ...) are untouched.
-    # --------------------------------------------------------------
-    for sheet_name, df in sheets_to_write:
-        try:
-            with pd.ExcelWriter(
-                config_path,
-                engine='openpyxl',
-                mode='a',
-                if_sheet_exists='replace',
-            ) as writer:
-                df.to_excel(writer, sheet_name=sheet_name, index=False)
-        except Exception as e:
-            print(f"[write_missing_config_sheets] failed to write "
-                  f"'{sheet_name}': {e}") 
-
-# def write_missing_config_sheets(model: ScheduleModel, config_path: str):
-#     from openpyxl import load_workbook
-#     import pandas as pd
-
-#     # 1. Load existing Stations data (to preserve user-entered DutyCounts)
-#     existing_stations = {}
-#     try:
-#         df_existing = pd.read_excel(config_path, sheet_name='Stations')
-#         for _, row in df_existing.iterrows():
-#             name = str(row['Station']).strip()
-#             weekday = str(row.get('WeekdayDutyCounts', '')).strip()
-#             weekend = str(row.get('WeekendDutyCounts', '')).strip()
-#             if weekday == 'nan':
-#                 weekday = ''
-#             if weekend == 'nan':
-#                 weekend = ''
-#             existing_stations[name] = (weekday, weekend)
-#     except:
-#         pass
-
-#     # 2. Merge with detected stations
-#     new_stations = {}
-#     for station_name in sorted(model.found_station_names):
-#         if station_name in existing_stations:
-#             weekday, weekend = existing_stations[station_name]
-#         else:
-#             weekday = ''
-#             if station_name in ['65 LAF', '65 PP', '85 Häm/Onk/Rheu', '92 KMT']:
-#                 weekend = 'PR=1'
-#             else:
-#                 weekend = ''
-#         new_stations[station_name] = (weekday, weekend)
-
-#     # Keep existing stations not in template
-#     for name, (weekday, weekend) in existing_stations.items():
-#         if name not in new_stations:
-#             new_stations[name] = (weekday, weekend)
-
-#     stations_data = []
-#     for name, (weekday, weekend) in sorted(new_stations.items()):
-#         stations_data.append([name, 'No', weekday, weekend])
-#     df_stations = pd.DataFrame(stations_data, columns=['Station', 'RequiresSenior', 'WeekdayDutyCounts', 'WeekendDutyCounts'])
-
-#     # 3. Prepare Doctors data
-#     doctors_data = []
-#     for doc in model.doctors.values():
-#         name = doc.name
-#         active = getattr(model, '_active_override', {}).get(name, 'Yes')
-#         weekend = getattr(model, '_weekend_override', {}).get(name, 'Yes')
-#         doctors_data.append([name, doc.fte, doc.station, active, weekend])
-
-#     if hasattr(model, '_inactive_doctors'):
-#         for name, info in model._inactive_doctors.items():
-#             doctors_data.append([
-#                 name,
-#                 info['fte'],
-#                 info['station'],
-#                 info['active'],
-#                 info['weekend']
-#             ])
-#     df_doctors = pd.DataFrame(doctors_data, columns=['Name', 'FTE (%)', 'Station', 'Active', 'Weekend'])
-
-#     # 4. Load workbook, delete Doctors and Stations if they exist
-#     wb = load_workbook(config_path)
-#     for sheet_name in ['Doctors', 'Stations']:
-#         if sheet_name in wb.sheetnames:
-#             del wb[sheet_name]
-#     wb.save(config_path)
-
-#     # 5. Write new Doctors and Stations sheets
-#     with pd.ExcelWriter(config_path, engine='openpyxl', mode='a', if_sheet_exists='new') as writer:
-#         df_doctors.to_excel(writer, sheet_name='Doctors', index=False)
-#         df_stations.to_excel(writer, sheet_name='Stations', index=False)
-
-#     # 6. Create/update other sheets (Skills, DutyTypes, etc.) without deleting
-#     with pd.ExcelWriter(config_path, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
-#         # Skills
-#         if 'Skills' not in wb.sheetnames:
-#             pd.DataFrame(columns=['Doctor', 'DutyType']).to_excel(writer, sheet_name='Skills', index=False)
-#         else:
-#             df_skills = pd.read_excel(config_path, sheet_name='Skills')
-#             if df_skills.empty:
-#                 pd.DataFrame(columns=['Doctor', 'DutyType']).to_excel(writer, sheet_name='Skills', index=False)
-
-#         # DutyTypes – if missing, create default
-#         if 'DutyTypes' not in wb.sheetnames:
-#             duty_data = []
-#             for abbr, dt in model.duty_types.items():
-#                 duty_data.append([abbr, dt.fullname,
-#                                   'Yes' if dt.requires_senior else 'No',
-#                                   'Yes' if dt.weekend_only else 'No',
-#                                   dt.priority])
-#             df_duty = pd.DataFrame(duty_data, columns=['Abbr', 'FullName', 'RequiresSenior', 'WeekendOnly', 'Priority'])
-#             df_duty.to_excel(writer, sheet_name='DutyTypes', index=False)
-
-#         # --- Create StationCodeMap if missing ---
-#         if 'StationCodeMap' not in wb.sheetnames:
-#             df_map = get_default_station_code_map()
-#             df_map.to_excel(writer, sheet_name='StationCodeMap', index=False)
-
-#         # Other required sheets (if missing)
-#         required_sheets = {
-#             'GeneralRules': pd.DataFrame({
-#                                         'RuleName': ['MaxConsecutiveWorkDays', 'MaxDutiesPerWeek', 'MainDoctorMaxWeekend'],
-#                                         'Value': [6, 5, 1]
-#                                         }),
-#             'Penalties': pd.DataFrame({'Penalty': [
-#                                                 'Preference',
-#                                                 'WorkloadBalance',
-#                                                 'WeekendBalance',
-#                                                 'WeekendPairingReward',
-#                                                 'WeekendSinglePenalty',
-#                                                 'WeekendHomeStationBonus',
-#                                                 'KMBalance',
-#                                                 'CrossStation',
-#                                                 'DayOffPenalty',
-#                                                 'SDBalance',
-#                                                 'ZDConsecutiveReward',
-#                                                 'BridgeDay',], 
-#                                        'Weight': [10, 300, 50,30,20,10,30,50,60,150,50,50]}),
-#             'Constraints': pd.DataFrame({'Constraint': ['MaxConsecutive', 'MaxPerWeek', 'WeekendOnly', 'SeniorRequired', 'WeekendAvailability', 'WeekendOnlyFullTime', 'WeekendOnlyForSkilled', 'MaxOneWeekendPerDoctor'], 'Enabled': ['Yes', 'Yes', 'No', 'Yes', 'Yes', 'Yes', 'Yes', 'No']}),
-#             'Preferences': pd.DataFrame(columns=['Doctor', 'Day', 'DutyType', 'Priority']),
-#             'SpecialWeekendDays': pd.DataFrame(columns=['Date', 'Description']),
-#             'OutputOptions': pd.DataFrame({'Option': ['IncludeStatistics', 'IncludeConflictReport', 'IncludeExplanation'], 'Value': ['Yes', 'Yes', 'Yes']})
-#         }
-#         for sheet_name, df_template in required_sheets.items():
-#             if sheet_name not in wb.sheetnames:
-#                 df_template.to_excel(writer, sheet_name=sheet_name, index=False)
-#             else:
-#                 df_existing = pd.read_excel(config_path, sheet_name=sheet_name)
-#                 if df_existing.empty:
-#                     df_template.to_excel(writer, sheet_name=sheet_name, index=False)
-
-#     print("Doctors and Stations sheets replaced (no duplicates).")
-#     print("Other configuration sheets (Skills, DutyTypes, etc.) are ready.")
+ 
 
 def write_working_hours(config_path: str, hours: Dict[str, float]):
     df = pd.DataFrame(list(hours.items()), columns=['Doctor', 'Hours'])

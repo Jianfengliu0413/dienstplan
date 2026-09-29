@@ -789,7 +789,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
     #     visualize_schedule(schedule, assignment, duties, doctors, output_file.replace('.xlsx', ''))
     # except Exception as e:
     #     print(f"Visualization failed: {e}")
-    return output_file
+    return schedule
  
 def run_scheduler(template_path, output_path, config_path, wishes_path=None, config_dict=None):
     """
@@ -797,6 +797,7 @@ def run_scheduler(template_path, output_path, config_path, wishes_path=None, con
     """
     log_capture = StringIO()
     sys.stdout = log_capture
+    
     try:
         if config_dict is not None:
             # Write config_dict to a temporary file
@@ -807,13 +808,14 @@ def run_scheduler(template_path, output_path, config_path, wishes_path=None, con
                         df_clean = df.fillna("") if isinstance(df, pd.DataFrame) else pd.DataFrame(df)
                         df_clean.to_excel(writer, sheet_name=sheet, index=False)
                 temp_path = tmp.name
-            main(template_path, output_path, temp_path, wishes_file=wishes_path)
+            schedule = main(template_path, output_path, temp_path, wishes_file=wishes_path)
             os.unlink(temp_path)
         else:
-            main(template_path, output_path, config_path, wishes_file=wishes_path)
+            schedule = main(template_path, output_path, config_path, wishes_file=wishes_path)
         success = True
     except Exception as e:
         success = False
+        schedule = None
         raise e
     finally:
         sys.stdout = sys.__stdout__

@@ -278,7 +278,7 @@ def write_missing_config_sheets(model, config_path):
             dt.fullname,
             'Yes' if dt.requires_senior else 'No',
             'Yes' if dt.weekend_only else 'No',
-            list dt.priority of,
+            dt.priority,
         ])
     df_d (uty = pd.DataFrame(
         duty_data,

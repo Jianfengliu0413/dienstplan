@@ -657,7 +657,7 @@ def main(template_file=None, output_file=None, config_path='Rules.xlsx', wishes_
     schedule = parse_template(template_file, config, wishes_path=wishes_file)
 
     # # Always write detected doctors and stations back to Rules.xlsx
-    write_missing_config_sheets(schedule, config_path)
+    write_missing_config_sheets(schedule, RULES_FILE)
     # write_skills_auto(schedule, config_path)
     print("Doctors and Stations sheets updated from template.")
 

@@ -280,7 +280,7 @@ def write_missing_config_sheets(model, config_path):
             'Yes' if dt.weekend_only else 'No',
             dt.priority,
         ])
-    df_d (uty = pd.DataFrame(
+    df_duty = pd.DataFrame(
         duty_data,
         columns=['Abbr', 'FullName', 'RequiresSenior',
                  'WeekendOnly', 'Priority'],

@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from scheduler import run_scheduler
+from scheduler import run_scheduler, write_missing_config_sheets
 from config_loader import load_config
 
 

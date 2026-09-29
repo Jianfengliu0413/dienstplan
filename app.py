@@ -495,7 +495,7 @@ with tab1:
                     current_config["SpecialWeekendDays"] = df
 
                 wishes = st.session_state.get("wishes_path")
-                success, log_output,schedule = run_scheduler(
+                success, log_output, schedule = run_scheduler(
                     template_path,
                     output_file,
                     None,
@@ -505,7 +505,7 @@ with tab1:
                 st.session_state["log_output"] = log_output
                 if success and schedule is not None:
                     try:
-                        write_missing_config_sheets(schecule, RULES_FILE)
+                        write_missing_config_sheets(schedule, RULES_FILE)
                     except Exception as e:
                         st.warning(f"could not write Auto sheets: {e}")
                 if success and os.path.exists(output_file):

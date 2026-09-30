@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from scheduler import run_scheduler, write_missing_config_sheets
+from scheduler import run_scheduler, write_missing_config_sheets, RULES_FILE
 from config_loader import load_config
 
 
@@ -30,7 +30,7 @@ st.set_page_config(
 # ------------------------------------------------------------------
 # Constants
 # ------------------------------------------------------------------
-RULES_FILE = "Rules_updated.xlsx"
+# RULES_FILE = "Rules_updated.xlsx"
 INACTIVITY_TIMEOUT_SECONDS = 300
 PROJECT_ROOT = Path(__file__).resolve().parent
 

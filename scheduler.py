@@ -21,8 +21,9 @@ from io import StringIO
 from typing import List, Tuple, Dict
 
 from demand_builder import MAIN_STATIONS
-
-RULES_FILE = 'Rules_updated.xlsx' 
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parent
+RULES_FILE = str(PROJECT_ROOT / "Rules_updated.xlsx")
 
 
 def _read_existing_sheet(config_path, sheet_name):

@@ -503,11 +503,13 @@ with tab1:
                     config_dict=current_config,
                 )
                 st.session_state["log_output"] = log_output
-                if success and schedule is not None:
-                    try:
-                        write_missing_config_sheets(schedule, RULES_FILE)
-                    except Exception as e:
-                        st.warning(f"could not write Auto sheets: {e}")
+                
+                # if success and schedule is not None:
+                #     try:
+                #         write_missing_config_sheets(schedule, RULES_FILE)
+                #     except Exception as e:
+                #         st.warning(f"could not write Auto sheets: {e}")
+
                 if success and os.path.exists(output_file):
                     st.success(
                         f"Schedule generated successfully → `{output_file}`"

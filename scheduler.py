@@ -185,25 +185,43 @@ def write_missing_config_sheets(model, config_path):
     df_duty = pd.DataFrame(duty_data, columns=['Abbr', 'FullName', 'RequiresSenior', 'WeekendOnly', 'Priority', 'Hours'])
 
     # ---- 6. Write BOTH the real sheet and the -Auto snapshot ----
-    sheets_to_write = [
-        ('Doctors', df_doctors),
-        ('Doctors-Auto', df_doctors),
-        ('Stations', df_stations),
-        ('Stations-Auto', df_stations),
-        ('Skills-Auto', df_skills),
-        ('DutyTypes-Auto', df_duty),
-    ]
-    for sheet_name, df in sheets_to_write:
-        try:
-            with pd.ExcelWriter(config_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                df.to_excel(writer, sheet_name=sheet_name, index=False)
-        except Exception as e:
-            print(f"[write_missing_config_sheets] failed '{sheet_name}': {e}")
+    # sheets_to_write = [
+    #     ('Doctors', df_doctors),
+    #     ('Doctors-Auto', df_doctors),
+    #     ('Stations', df_stations),
+    #     ('Stations-Auto', df_stations),
+    #     ('Skills-Auto', df_skills),
+    #     ('DutyTypes-Auto', df_duty),
+    # ]
+    # for sheet_name, df in sheets_to_write:
+    #     try:
+    #         with pd.ExcelWriter(config_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+    #             df.to_excel(writer, sheet_name=sheet_name, index=False)
+    #     except Exception as e:
+    #         print(f"[write_missing_config_sheets] failed '{sheet_name}': {e}")
 
-    print(f"[config] Updated Doctors ({len(df_doctors)}), Stations ({len(df_stations)}), Skills ({len(df_skills)})")
+    # print(f"[config] Updated Doctors ({len(df_doctors)}), Stations ({len(df_stations)}), Skills ({len(df_skills)})")
 
 
 
+    # ---- 6. Write BOTH the real sheet and the -Auto snapshot ----
+    sheets = {
+        'Doctors': df_doctors,
+        'Doctors-Auto': df_doctors,
+        'Stations': df_stations,
+        'Stations-Auto': df_stations,
+        'Skills-Auto': df_skills,
+        'DutyTypes-Auto': df_duty,
+    }
+    try:
+        with pd.ExcelWriter(config_path, engine='openpyxl',
+                            mode='a', if_sheet_exists='replace') as writer:
+            for name, df in sheets.items():
+                df.to_excel(writer, sheet_name=name, index=False)
+        print(f"[config] wrote {list(sheets)} to {config_path}")
+    except Exception as e:
+        print(f"[write_missing_config_sheets] FAILED: {e}")
+        raise
 
 
 

@@ -271,17 +271,18 @@ if _touch_activity():
 with st.sidebar:
     st.markdown("### Upload Files (click or drag files)")
 
-    # ---------- Rules ----------
+    # ---------- Rules ---------- 
     rules_file = st.file_uploader("Rules.xlsx", type=["xlsx"])
     if rules_file is not None:
-        with open(RULES_FILE, "wb") as f:
-            f.write(rules_file.getvalue())
-        st.session_state["rules_file_path"] = RULES_FILE
-        st.session_state["config_loaded"] = True
-        st.session_state["file_hashes"]["rules"] = hashlib.md5(
-            rules_file.getvalue()
-        ).hexdigest()
-
+        new_hash = hashlib.md5(rules_file.getvalue()).hexdigest()
+        if st.session_state["file_hashes"].get("rules") != new_hash:
+            with open(RULES_FILE, "wb") as f:
+                f.write(rules_file.getvalue())
+            st.session_state["rules_file_path"] = RULES_FILE
+            st.session_state["config_loaded"] = True
+            st.session_state["file_hashes"]["rules"] = new_hash
+            # Invalidate cached config so it reloads the new upload
+            _cached_load_config.clear()
     # ---------- Template ----------
     template_file = st.file_uploader(
         "Stationsplan (.xlsx)",

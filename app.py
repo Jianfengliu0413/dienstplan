@@ -153,12 +153,10 @@ def _safe_unlink(path: str) -> None:
 
 
 def _cleanup_session() -> None:
-    """Delete every temp file this session created, then clear state."""
-    _safe_unlink(RULES_FILE)
-    for key in ("template_path", "wishes_path"):
-        _safe_unlink(st.session_state.get(key))
+    _safe_unlink(st.session_state.get("template_path"))
+    _safe_unlink(st.session_state.get("wishes_path"))
+    # keep RULES_FILE until the user explicitly resets
     st.session_state.clear()
-
 # ------------------------------------------------------------------
 # Cache cleanup
 # ------------------------------------------------------------------
@@ -332,11 +330,10 @@ with st.sidebar:
            loaded_text="Loaded", missing_text="Not set")
 
     st.markdown("---")
-
     if st.button("Reset All", use_container_width=True):
+        _safe_unlink(RULES_FILE)
         _cleanup_session()
         st.rerun()
-
 
 # ------------------------------------------------------------------
 # Welcome page (no Rules uploaded yet)
@@ -502,19 +499,19 @@ with tab1:
                     wishes,
                     config_dict=current_config,
                 )
-                st.session_state["log_output"] = log_output
-                
-                # if success and schedule is not None:
-                #     try:
-                #         write_missing_config_sheets(schedule, RULES_FILE)
-                #     except Exception as e:
-                #         st.warning(f"could not write Auto sheets: {e}")
-
+                st.session_state["log_output"] = log_output 
                 if success and os.path.exists(output_file):
                     st.success(
                         f"Schedule generated successfully → `{output_file}`"
                     )
                     st.session_state["output_file"] = output_file
+
+                    # Ensure the auto sheets are always (re)written and cached
+                    try:
+                        if schedule is not None:
+                            write_missing_config_sheets(schedule, RULES_FILE)
+                    except Exception as e:
+                        st.warning(f"Could not write Auto sheets: {e}")
                 else:
                     st.error(
                         "Scheduler failed. See the log below for details."
@@ -557,12 +554,14 @@ with tab3:
         st.markdown("#### Rules.xlsx")
         if os.path.exists(RULES_FILE):
             with open(RULES_FILE, "rb") as f:
+                data = f.read()               # read once, snapshot
                 st.download_button(
                     "Download Updated Rules",
-                    data=f,
+                    data=data,
                     file_name=RULES_FILE,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
+                    key="dl_rules",               # stable key
                 )
         else:
             st.info("No Rules.xlsx available.")

@@ -389,6 +389,27 @@ def add_hard_constraints(
                 model_cp.Add(sum(x_vars[(i, j)] for i in hd_indices) <= max_hd_per_doctor)
 
     # ============================================================
+    # Combined cap: HD + NAZ, accounting for fixed assignments
+    # ============================================================
+    max_hd_naz_combined = int(general.get('MaxHdNazCombined', 1))
+    if constraints_cfg.get('MaxHdNazCombined', 'Yes') == 'Yes':
+        # Count fixed HD/NAZ per doctor first
+        fixed_hd_naz_count = defaultdict(int)
+        for doc_name, day_idx, station, abbr in schedule.fixed_assignments:
+            if abbr in ('HD', 'NAZ'):
+                fixed_hd_naz_count[doc_name] += 1
+
+        for j, doc_name in enumerate(doctors):
+            already_fixed = fixed_hd_naz_count.get(doc_name, 0)
+            remaining = max(0, max_hd_naz_combined - already_fixed)
+            hd_naz_indices = [
+                i for i, (_, _, abbr) in enumerate(duties)
+                if abbr in ('HD', 'NAZ') and i not in fixed_duty_indices
+            ]
+            if hd_naz_indices:
+                model_cp.Add(sum(x_vars[(i, j)] for i in hd_naz_indices)
+                            <= remaining)
+    # ============================================================
     # 17e. Max weekend PR per doctor – MUST account for fixed PR
     # ============================================================
     max_pr_weekend = int(general.get('MaxWeekendPRPerDoctor', 1))
